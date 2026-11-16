@@ -2,7 +2,7 @@
 
 # Cortana Desktop – arkitektur
 
-Nov 17, 2026 · @Philip
+Nov 16, 2026 · @Philip
 
 ## Mål och prestandabudget
 
@@ -452,7 +452,7 @@ Det normala läget med Claude kan köra samtidigt som spel utan märkbar påverk
 
 ## Att hämta från Capri
 
-Capris kod får återanvändas eftersom projektet är privat och ickekommersiellt, så länge vi lägger till Capris `Required Notice`-rader och länk i en `NOTICE.md`. Grafiken får inte användas. Capri är WinForms och vi är WPF, så i praktiken porteras logik och idéer, inte hela filer. Granskat mot `main`, 17 nov 2026 (1 865 commits).
+Capris kod får återanvändas eftersom projektet är privat och ickekommersiellt, så länge vi lägger till Capris `Required Notice`-rader och länk i en `NOTICE.md`. Grafiken får inte användas. Capri är WinForms och vi är WPF, så i praktiken porteras logik och idéer, inte hela filer. Granskat mot `main`, 16 nov 2026 (1 865 commits).
 
 | Capri-fil | Vad den gör | Värde för oss | När |
 | --- | --- | --- | --- |

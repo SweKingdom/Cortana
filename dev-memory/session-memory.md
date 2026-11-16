@@ -42,7 +42,7 @@ Rules:
 - Measured: Release build 0 warnings/0 errors; app starts and exits cleanly; tray icon created; System.Speech lists en-US and sv-SE voices and synthesizes silently; framework-dependent publish 1.42 MB (packages add about 1.3 MB). perfcheck.ps1 does not exist yet (step 1).
 - Found: the previous entry said the starter files were uncommitted, but commit 79e1128 already existed and the tree was clean.
 - Doc fixes approved by Philip: docs/architecture.md line 173 now defers process mode to P1 (D-037); line 567 now says D-001 to D-048. Philip has updated the claude.ai doc to match.
-- Date correction, approved by Philip: earlier entries and files used 2026-11-17 by mistake; today is 2026-11-16. Every ISO 2026-11-17 in dev-memory/ and docs/ was changed to 2026-11-16 (this includes past entries and decision rows, by his instruction). Not changed: "Nov 17, 2026" in the architecture doc header (line 5) and "17 nov 2026" (line 455, Capri review date), which use other formats.
+- Date correction, approved by Philip: earlier entries and files used 2026-11-17 by mistake; today is 2026-11-16. Every ISO 2026-11-17 in dev-memory/ and docs/ was changed to 2026-11-16 (this includes past entries and decision rows, by his instruction). The two non-ISO spellings ("Nov 17, 2026" at architecture.md line 5, "17 nov 2026" at line 455) were changed to 16 in a follow-up commit, also by his instruction.
 - Uncertain: nothing new. D-049 (package versions, .sln) skipped by Philip; versions live in the .csproj.
 - Last confirmed action: Philip approved the dev-memory updates, doc fixes and date correction, and asked for commit, merge to main and push.
 - Next: step 1 (window and orb, P3/P4).
