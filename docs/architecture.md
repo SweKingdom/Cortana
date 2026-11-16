@@ -1,4 +1,4 @@
-<!-- Exporterad från https://claude.ai/artifact/2J4bZZSfKJv2FCWrGrHm87 den 2026-11-17. Källan är claude.ai-dokumentet; uppdatera båda. -->
+<!-- Exporterad från https://claude.ai/artifact/2J4bZZSfKJv2FCWrGrHm87 den 2026-11-16. Källan är claude.ai-dokumentet; uppdatera båda. -->
 
 # Cortana Desktop – arkitektur
 
@@ -170,7 +170,7 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       ChatInput.xaml       textruta (klick eller kortkommando)
     Brain/
       IBrain.cs
-      ClaudeCodeBrain.cs   Claude-abonnemanget, en bestående claude-process
+      ClaudeCodeBrain.cs   Claude-abonnemanget; processläge enligt P1 (D-037)
       AnthropicBrain.cs    Claude med API-nyckel (valfritt)
       OpenAiCompatBrain.cs lokal modell, OpenRouter, OpenAI m.fl.
       ModelRouter.cs       Haiku eller Sonnet per meddelande
@@ -323,7 +323,7 @@ Oavsett sätt finns **en enda ägare av historiken**. Avbrott använder CLI:ts `
 2. Prompten = personlighetsfilen (inkl. vald flirtnivå och `boundaries`) + `facts.md` + `impressions.md` + `summary.md` + en rad med datum, tid och aktivt program.
 3. De senaste 20 meddelandena skickas ordagrant.
 4. När historiken passerar 30 meddelanden sammanfattas de äldsta i `summary.md`. Sammanfattningen beskriver bara vad som hänt, aldrig vem hon är.
-5. Verktyget `remember` föreslår en ny post, och du kan ångra direkt i bubblan. En post är en rad med kort id, datum och källa: `- [f12 | 2026-11-17 | chat] Philip codes in C#`. En rättelse är en ny rad: `- [f19 | 2026-11-20 | chat | replaces f12] …`. Preferenser (t.ex. "keep replies short") ligger i `facts.md` under rubriken `## Preferences`.
+5. Verktyget `remember` föreslår en ny post, och du kan ångra direkt i bubblan. En post är en rad med kort id, datum och källa: `- [f12 | 2026-11-16 | chat] Philip codes in C#`. En rättelse är en ny rad: `- [f19 | 2026-11-20 | chat | replaces f12] …`. Preferenser (t.ex. "keep replies short") ligger i `facts.md` under rubriken `## Preferences`.
 6. Tak: \~800 tokens per minnesfil, med städning som du godkänner (se Driftregler, punkt 5).
 7. Budget: \~3 000 tokens per anrop, uppskattat som tecken / 4 i `PromptBuilder`. Över budget tas de äldsta ordagranna meddelandena bort först, sedan kortas långa meddelanden. Personligheten kortas aldrig.
 
@@ -564,6 +564,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-047) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-048) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

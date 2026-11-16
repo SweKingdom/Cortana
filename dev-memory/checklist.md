@@ -2,7 +2,7 @@
 
 Owns next steps and blockers. Done criteria are measured with tools/perfcheck.ps1 (D-040).
 
-- [ ] **0. Repo setup**: starter files done 2026-11-17 (CLAUDE.md, NOTICE.md, .gitignore, docs/, dev-memory/, prompts/); first commit pending. Remaining: create the WPF project on `net10.0-windows` (D-036) under `src/Companion/`. Confirm H.NotifyIcon.Wpf and System.Speech work there. Every JSON file gets `"version": 1` (D-044).
+- [x] **0. Repo setup**: done 2026-11-16. Starter files committed (79e1128); WPF project on `net10.0-windows` (D-036) in `src/Companion/` with `Cortana.sln`. H.NotifyIcon.Wpf and System.Speech confirmed working there (tray icon created; en-US voice synthesizes). Framework-dependent publish 1.42 MB. Every JSON file gets `"version": 1` (D-044) when the first one is created.
 - [ ] **1. Window and orb**: transparent draggable always-on-top window, breathing orb, tray icon with Quit, panic hotkey (D-030), perfcheck.ps1, Per Monitor V2 DPI (D-047).
       Includes prototypes P3 (idle CPU at 30/15/10 fps) and P4 (click-through, DragMove, game-mode window styles over a borderless game).
       Done when: app <150 MB private bytes, idle CPU <0.5% of one core, start to orb <1 s.
