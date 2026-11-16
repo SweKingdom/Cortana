@@ -1,0 +1,121 @@
+claude 2.1.318 (Claude Code)
+== Mode A: one process per message
+  A turn  1: init=1006 first=1717 total=2014 ram=410MB/2p in=2 cc=1041 cr=0 out=79 model=claude-haiku-5-5 
+  A turn  2: init=833 first=1925 total=2331 ram=423MB/2p in=2 cc=1113 cr=0 out=130 model=claude-haiku-5-5 
+  A turn  3: init=815 first=1356 total=1786 ram=415MB/2p in=2 cc=1193 cr=0 out=61 model=claude-haiku-5-5 
+  A turn  4: init=833 first=1891 total=2450 ram=400MB/2p in=2 cc=1270 cr=0 out=157 model=claude-haiku-5-5 
+  A turn  5: init=788 first=1705 total=2164 ram=410MB/2p in=2 cc=1369 cr=0 out=151 model=claude-haiku-5-5 
+  A turn  6: init=840 first=1829 total=2283 ram=401MB/2p in=2 cc=1452 cr=0 out=128 model=claude-haiku-5-5 
+  A turn  7: init=873 first=2073 total=2563 ram=414MB/2p in=2 cc=1520 cr=0 out=178 model=claude-haiku-5-5 
+  A turn  8: init=902 first=2818 total=3195 ram=407MB/2p in=2 cc=1602 cr=0 out=297 model=claude-haiku-5-5 
+  A turn  9: init=851 first=2155 total=2601 ram=396MB/2p in=2 cc=1678 cr=0 out=204 model=claude-haiku-5-5 
+  A turn 10: init=882 first=2565 total=3115 ram=377MB/2p in=2 cc=1772 cr=0 out=290 model=claude-haiku-5-5 
+  A turn 11: init=849 first=1627 total=1879 ram=406MB/2p in=2 cc=1877 cr=0 out=83 model=claude-haiku-5-5 
+  A turn 12: init=837 first=3004 total=3176 ram=409MB/2p in=2 cc=1875 cr=0 out=289 model=claude-haiku-5-5 
+  A turn 13: init=823 first=2008 total=2437 ram=408MB/2p in=2 cc=1862 cr=0 out=198 model=claude-haiku-5-5 
+  A turn 14: init=875 first=1731 total=2283 ram=416MB/2p in=2 cc=1888 cr=0 out=159 model=claude-haiku-5-5 
+  A turn 15: init=917 first=2466 total=2567 ram=411MB/2p in=2 cc=1891 cr=0 out=191 model=claude-haiku-5-5 
+  A turn 16: init=895 first=1461 total=1760 ram=397MB/2p in=2 cc=1839 cr=0 out=29 model=claude-haiku-5-5 
+  A turn 17: init=972 first=2125 total=2179 ram=412MB/2p in=2 cc=1820 cr=0 out=161 model=claude-haiku-5-5 recall_teal=True
+  A turn 18: init=794 first=1682 total=2271 ram=388MB/2p in=2 cc=1767 cr=0 out=201 model=claude-haiku-5-5 
+  A turn 19: init=853 first=2198 total=2638 ram=402MB/2p in=2 cc=1812 cr=0 out=225 model=claude-haiku-5-5 
+  A turn 20: init=812 first=1932 total=2111 ram=406MB/2p in=2 cc=1783 cr=0 out=148 model=claude-haiku-5-5 
+  A interrupt  1: init=845 first=9195 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 kill_to_exit=22ms got_result_after_kill=False
+  A after-interrupt  1: init=874 first=1556 total=1617 ram=417MB/2p in=2 cc=1044 cr=0 out=10 model=claude-haiku-5-5 next spawn works=True
+  A interrupt  2: init=862 first=12924 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 kill_to_exit=19ms got_result_after_kill=False
+  A after-interrupt  2: init=850 first=1364 total=1580 ram=418MB/2p in=2 cc=1045 cr=0 out=10 model=claude-haiku-5-5 next spawn works=True
+  A interrupt  3: init=1012 first=14194 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 kill_to_exit=16ms got_result_after_kill=False
+  A after-interrupt  3: init=816 first=1356 total=1581 ram=401MB/2p in=2 cc=1045 cr=0 out=10 model=claude-haiku-5-5 next spawn works=True
+  A interrupt  4: init=847 first=8980 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 kill_to_exit=17ms got_result_after_kill=False
+  A after-interrupt  4: init=916 first=1527 total=1729 ram=405MB/2p in=2 cc=1039 cr=0 out=9 model=claude-haiku-5-5 next spawn works=True
+  A interrupt  5: init=849 first=9435 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 kill_to_exit=17ms got_result_after_kill=False
+  A after-interrupt  5: init=1060 first=1538 total=1735 ram=397MB/2p in=2 cc=1043 cr=0 out=10 model=claude-haiku-5-5 next spawn works=True
+  A set_model  1: init=1075 first=1631 total=2010 ram=390MB/2p in=2 cc=1716 cr=0 out=29 model=claude-sonnet-5-5 sonnet_model=True recalls_hike=True
+== Mode B: one process per session
+  B turn  1: init=884 first=1844 total=2175 ram=392MB/2p in=2 cc=1043 cr=0 out=117 model=claude-haiku-5-5 cold(includes spawn) 
+  B turn  2: init=10 first=444 total=1022 ram=398MB/2p in=2 cc=154 cr=1043 out=69 model=claude-haiku-5-5 
+  B turn  3: init=7 first=458 total=948 ram=403MB/2p in=2 cc=105 cr=1197 out=68 model=claude-haiku-5-5 
+  B turn  4: init=7 first=444 total=948 ram=418MB/2p in=2 cc=104 cr=1302 out=78 model=claude-haiku-5-5 
+  B turn  5: init=8 first=773 total=1171 ram=419MB/2p in=2 cc=119 cr=1406 out=120 model=claude-haiku-5-5 
+  B turn  6: init=7 first=475 total=917 ram=441MB/2p in=2 cc=156 cr=1525 out=56 model=claude-haiku-5-5 
+  B turn  7: init=7 first=573 total=1043 ram=430MB/2p in=2 cc=93 cr=1681 out=62 model=claude-haiku-5-5 
+  B turn  8: init=7 first=442 total=864 ram=431MB/2p in=2 cc=98 cr=1774 out=51 model=claude-haiku-5-5 
+  B turn  9: init=8 first=780 total=1118 ram=434MB/2p in=2 cc=91 cr=1872 out=104 model=claude-haiku-5-5 
+  B turn 10: init=8 first=474 total=1092 ram=435MB/2p in=2 cc=146 cr=1963 out=100 model=claude-haiku-5-5 
+  B turn 11: init=7 first=500 total=766 ram=431MB/2p in=2 cc=136 cr=2109 out=29 model=claude-haiku-5-5 
+  B turn 12: init=8 first=542 total=841 ram=428MB/2p in=2 cc=63 cr=2245 out=38 model=claude-haiku-5-5 
+  B turn 13: init=7 first=862 total=1264 ram=427MB/2p in=2 cc=77 cr=2308 out=137 model=claude-haiku-5-5 
+  B turn 14: init=7 first=757 total=1221 ram=429MB/2p in=2 cc=178 cr=2385 out=73 model=claude-haiku-5-5 
+  B turn 15: init=8 first=1397 total=1633 ram=432MB/2p in=2 cc=111 cr=2563 out=20 model=claude-haiku-5-5 
+  B turn 16: init=8 first=1121 total=1478 ram=435MB/2p in=2 cc=56 cr=2674 out=35 model=claude-haiku-5-5 
+  B turn 17: init=7 first=727 total=911 ram=436MB/2p in=2 cc=73 cr=2730 out=11 model=claude-haiku-5-5 recall_teal=True
+  B turn 18: init=7 first=476 total=925 ram=435MB/2p in=2 cc=47 cr=2803 out=78 model=claude-haiku-5-5 
+  B turn 19: init=7 first=488 total=952 ram=436MB/2p in=2 cc=118 cr=2850 out=71 model=claude-haiku-5-5 
+  B turn 20: init=7 first=436 total=725 ram=437MB/2p in=2 cc=99 cr=2968 out=39 model=claude-haiku-5-5 
+  B idle 10 s after last turn: private 435 MB, working set 222 MB / 2 procs claude:433+conhost:1
+  B interrupt  1: init=7 first=668 total=989 ram=0MB/0p in=0 cc=0 cr=0 out=0 model=claude-haiku-5-5 ctrl_resp_ms=6 interrupt_to_result_ms=12 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int1","response":{"still_queued":[]}}}
+  B after-interrupt  1: init=10 first=451 total=630 ram=441MB/0p in=2 cc=148 cr=3159 out=9 model=claude-haiku-5-5 next turn works=True
+  B interrupt  2: init=13 first=790 total=1111 ram=0MB/0p in=0 cc=0 cr=0 out=0 model=claude-haiku-5-5 ctrl_resp_ms=1 interrupt_to_result_ms=6 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int2","response":{"still_queued":[]}}}
+  B after-interrupt  2: init=7 first=1251 total=1342 ram=441MB/0p in=4 cc=336 cr=6738 out=52 model=claude-haiku-5-5 next turn works=True
+  B interrupt  3: init=7 first=642 total=950 ram=0MB/0p in=0 cc=0 cr=0 out=0 model=claude-haiku-5-5 ctrl_resp_ms=1 interrupt_to_result_ms=5 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int3","response":{"still_queued":[]}}}
+  B after-interrupt  3: init=8 first=696 total=701 ram=443MB/0p in=2 cc=168 cr=3653 out=9 model=claude-haiku-5-5 next turn works=True
+  B interrupt  4: init=7 first=782 total=1094 ram=0MB/0p in=0 cc=0 cr=0 out=0 model=claude-haiku-5-5 ctrl_resp_ms=1 interrupt_to_result_ms=4 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int4","response":{"still_queued":[]}}}
+  B after-interrupt  4: init=5 first=650 total=656 ram=439MB/0p in=2 cc=202 cr=3883 out=9 model=claude-haiku-5-5 next turn works=True
+  B interrupt  5: init=6 first=732 total=1044 ram=0MB/0p in=0 cc=0 cr=0 out=0 model=claude-haiku-5-5 ctrl_resp_ms=1 interrupt_to_result_ms=5 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int5","response":{"still_queued":[]}}}
+  B after-interrupt  5: init=6 first=483 total=676 ram=444MB/0p in=2 cc=199 cr=4147 out=9 model=claude-haiku-5-5 next turn works=True
+  B set_model control: ok=True 4ms {"type":"control_response","response":{"subtype":"success","request_id":"sm1","response":{"model":"claude-sonnet-5-5"}}}
+  B set_model  1: init=160 first=1257 total=1584 ram=444MB/0p in=2 cc=4584 cr=0 out=69 model=claude-sonnet-5-5 control_ok=True ctrl_ms=4 sonnet_model=True recalls_hike=True raw={"type":"control_response","response":{"subtype":"success","request_id":"sm1","response":{"model":"claude-sonnet-5-5"}}}
+turns.csv written to c:\Users\phili\VSCode\Cortana\prototypes\P1\bin\Release\net10.0\
+
+## Summary (median / p90 / max)
+A: turns=20 fails_in_20_turns=0
+  first word ms (turns 1-20): 1925 / 2565 / 3004
+  spawn-to-init ms: 849 / 917 / 1006
+  total turn ms: 2283 / 3115 / 3195
+  claude tree RAM MB: 407 / 415 / 423  procs: 2
+  tokens at turn 1/5/10/15/20 (in+cache_create+cache_read -> total input; out):
+    t 1: in=2 cc=1041 cr=0 total_in=1043 out=79 cost=$0,00025
+    t 5: in=2 cc=1369 cr=0 total_in=1371 out=151 cost=$0,00035
+    t10: in=2 cc=1772 cr=0 total_in=1774 out=290 cost=$0,00077
+    t15: in=2 cc=1891 cr=0 total_in=1893 out=191 cost=$0,00069
+    t20: in=2 cc=1783 cr=0 total_in=1785 out=148 cost=$0,00043
+  totals over 20 turns: total_in=32464 fresh(in+cc)=32464 cache_read=0 out=3359 cost=$0,0112 (B cost is cumulative per session: last value)
+  working set MB: 207 / 209 / 209
+B: turns=20 fails_in_20_turns=0
+  first word ms (turns 2-20): 500 / 1121 / 1397
+  first word ms (turn 1, cold): 1844
+  spawn-to-init ms: 7 / 8 / 884
+  total turn ms: 952 / 1478 / 1633
+  claude tree RAM MB: 431 / 436 / 441  procs: 2
+  tokens at turn 1/5/10/15/20 (in+cache_create+cache_read -> total input; out):
+    t 1: in=2 cc=1043 cr=0 total_in=1045 out=117 cost=$0,00027
+    t 5: in=2 cc=119 cr=1406 total_in=1527 out=120 cost=$0,00071
+    t10: in=2 cc=146 cr=1963 total_in=2111 out=100 cost=$0,00110
+    t15: in=2 cc=111 cr=2563 total_in=2676 out=20 cost=$0,00148
+    t20: in=2 cc=99 cr=2968 total_in=3069 out=39 cost=$0,00182
+  totals over 20 turns: total_in=42505 fresh(in+cc)=3107 cache_read=39398 out=1356 cost=$0,0018 (B cost is cumulative per session: last value)
+  working set MB: 221 / 224 / 228
+
+## Interrupt / set_model rows
+  A interrupt 1: first=9195 total= model=claude-haiku-5-5 block=thinking kill_to_exit=22ms got_result_after_kill=False ENDED
+  A after-interrupt 1: first=1556 total=1617 model=claude-haiku-5-5 block=text claude:414+conhost:1 next spawn works=True
+  A interrupt 2: first=12924 total= model=claude-haiku-5-5 block=thinking kill_to_exit=19ms got_result_after_kill=False ENDED
+  A after-interrupt 2: first=1364 total=1580 model=claude-haiku-5-5 block=text claude:415+conhost:1 next spawn works=True
+  A interrupt 3: first=14194 total= model=claude-haiku-5-5 block=thinking kill_to_exit=16ms got_result_after_kill=False ENDED
+  A after-interrupt 3: first=1356 total=1581 model=claude-haiku-5-5 block=text claude:399+conhost:1 next spawn works=True
+  A interrupt 4: first=8980 total= model=claude-haiku-5-5 block=thinking kill_to_exit=17ms got_result_after_kill=False ENDED
+  A after-interrupt 4: first=1527 total=1729 model=claude-haiku-5-5 block=text claude:403+conhost:1 next spawn works=True
+  A interrupt 5: first=9435 total= model=claude-haiku-5-5 block=thinking kill_to_exit=17ms got_result_after_kill=False ENDED
+  A after-interrupt 5: first=1538 total=1735 model=claude-haiku-5-5 block=text claude:395+conhost:1 next spawn works=True
+  A set_model 1: first=1631 total=2010 model=claude-sonnet-5-5 block=text claude:388+conhost:1 sonnet_model=True recalls_hike=True
+  B interrupt 1: first=668 total=989 model=claude-haiku-5-5 block=thinking ctrl_resp_ms=6 interrupt_to_result_ms=12 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int1","response":{"still_queued":[]}}} ERROR:error_during_execution
+  B after-interrupt 1: first=451 total=630 model=claude-haiku-5-5 block=text claude:438+conhost:1 next turn works=True
+  B interrupt 2: first=790 total=1111 model=claude-haiku-5-5 block=thinking ctrl_resp_ms=1 interrupt_to_result_ms=6 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int2","response":{"still_queued":[]}}} ERROR:error_during_execution
+  B after-interrupt 2: first=1251 total=1342 model=claude-haiku-5-5 block=thinking claude:439+conhost:1 next turn works=True
+  B interrupt 3: first=642 total=950 model=claude-haiku-5-5 block=thinking ctrl_resp_ms=1 interrupt_to_result_ms=5 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int3","response":{"still_queued":[]}}} ERROR:error_during_execution
+  B after-interrupt 3: first=696 total=701 model=claude-haiku-5-5 block=text claude:440+conhost:1 next turn works=True
+  B interrupt 4: first=782 total=1094 model=claude-haiku-5-5 block=thinking ctrl_resp_ms=1 interrupt_to_result_ms=4 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int4","response":{"still_queued":[]}}} ERROR:error_during_execution
+  B after-interrupt 4: first=650 total=656 model=claude-haiku-5-5 block=text claude:437+conhost:1 next turn works=True
+  B interrupt 5: first=732 total=1044 model=claude-haiku-5-5 block=thinking ctrl_resp_ms=1 interrupt_to_result_ms=5 subtype=error_during_execution alive=True ctrl={"type":"control_response","response":{"subtype":"success","request_id":"int5","response":{"still_queued":[]}}} ERROR:error_during_execution
+  B after-interrupt 5: first=483 total=676 model=claude-haiku-5-5 block=text claude:441+conhost:1 next turn works=True
+  B set_model 1: first=1257 total=1584 model=claude-sonnet-5-5 block=thinking claude:442+conhost:1 control_ok=True ctrl_ms=4 sonnet_model=True recalls_hike=True raw={"type":"control_response","response":{"subtype":"success","request_id":"sm1","response":{"model":"claude-sonnet-5-5"}}}

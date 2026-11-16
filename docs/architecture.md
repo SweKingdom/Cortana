@@ -11,7 +11,7 @@ En privat skrivbordskompanjon i C# + WPF (.NET 10 LTS) som gör det Capri gör m
 | Mått | Hur det mäts | Normalt läge | Explicit läge (senare) |
 | --- | --- | --- | --- |
 | App-RAM | Private bytes för `Companion.exe` efter 60 s i vila | < 150 MB | < 150 MB |
-| Hela trädets RAM | Appen + alla `claude`-processer, i vila, redovisas separat | < 300 MB | appen + modellservern; modellen ligger på grafikkortet |
+| Hela trädets RAM | Appen + alla `claude`-processer, i vila (inga processer körs; under ett svar ca 480 MB, D-056), redovisas separat | < 300 MB | appen + modellservern; modellen ligger på grafikkortet |
 | VRAM | Aktivitetshanteraren, dedikerat GPU-minne | \~0 | ≤ 4–5 GB |
 | CPU i vila | Snitt över 60 s efter 30 s, klotet andas | < 2 % av en kärna (median av 3 körningar, D-052) | samma |
 | Start till synligt klot | Processtart till första ritade bild | < 1 s | < 1 s (modellen laddas först vid lägesbyte) |
@@ -176,7 +176,7 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       ChatInput.xaml       textruta (klick eller kortkommando)
     Brain/
       IBrain.cs
-      ClaudeCodeBrain.cs   Claude-abonnemanget; processläge enligt P1 (D-037)
+      ClaudeCodeBrain.cs   Claude-abonnemanget; en process per meddelande, förvärmd (D-055)
       AnthropicBrain.cs    Claude med API-nyckel (valfritt)
       OpenAiCompatBrain.cs lokal modell, OpenRouter, OpenAI m.fl.
       ModelRouter.cs       Haiku eller Sonnet per meddelande
@@ -316,12 +316,13 @@ Tre klasser täcker alla hjärnor. Normalt läge använder ditt Claude-abonneman
 
 **OpenAiCompatBrain** behöver bara bas-URL, nyckel och modellnamn. I det lokala läget är det Ollamas eller llama-servers adress på 127.0.0.1. Exempel på en hostad bas-URL: `https://generativelanguage.googleapis.com/v1beta/openai/`. Svaren strömmas (`stream: true`) så att bubblan fylls medan modellen skriver. Kostnaden är en `HttpClient` och några kilobyte.
 
-**ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --tools "" --strict-mcp-config --no-session-persistence --setting-sources project`, systemprompten via `--system-prompt` och `--append-system-prompt-file`). **Hur processen körs avgörs av prototyp P1** (se Byggordning), ett av två sätt och aldrig en blandning:
+**ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --tools "" --strict-mcp-config --no-session-persistence --setting-sources project --safe-mode --disable-slash-commands --system-prompt-file …`). Lägsta version är Claude Code 2.1.318; äldre versioner saknar `--safe-mode` och filflaggorna. **Prototyp P1 avgjorde (D-055): en process per meddelande**, Capris sätt. Appen äger all historik och skickar de senaste 20 meddelandena som ett transkript tillsammans med det nya. Byte av modell, flirtnivå och läge kostar inget.
 
-1. **En process per meddelande** (Capris sätt). Appen äger all historik. Byte av modell, flirtnivå och läge kostar inget. Priset är starttiden per svar.
-2. **En process per session.** Claude Code äger historiken inom sessionen och appen skickar bara det nya meddelandet. Processen startas om vid varje ändring av systemprompt eller modell och efter ett fast antal turer. Sonnet-byten kan köras som enstaka anrop vid sidan av.
+Startkostnaden (~850 ms per process) döljs genom **förvärmning**: processen startas när textrutan öppnas eller push-to-talk börjar, så starten överlappar med att du skriver, och meddelandet skrivs vid Enter. Stängs rutan utan att något skickas, eller går det 60 s, dödas den varma processen. Mätt i P1: första ordet ca 0,8 s (median) med förvärmning och 3 s skrivtid, mot ca 1,9 s utan. Haiku-svar i chatten ska köras utan utökat tänkande (Sonnet-eskaleringar får tänka). P1 hittade ingen brytare som tar bort tänkandet, men vanliga chattmeddelanden började aldrig med ett tänkandeblock, så mekanismen avgörs i steg 2 (D-055).
 
-Oavsett sätt finns **en enda ägare av historiken**. Avbrott använder CLI:ts `interrupt`-kommando. Claude Code får inga egna verktyg, så hennes verktyg anropas med ett textformat: modellen skriver `<tool name="set_reminder">{json}</tool>`, appen kör verktyget och skickar tillbaka resultatet, och `ReplyCleaner` tar bort verktygstexten innan svaret visas. Om prototyp P2 visar att textformatet är opålitligt exponeras verktygen i stället som en liten lokal MCP-server med JSON-scheman. Allt räknas mot abonnemangets gränser (se Driftregler, punkt 2).
+Alternativet en process per session mättes också (första ordet ca 0,5 s), men det lämnar ca 435 MB `claude`-minne i vila och ger appen och Claude Code varsin historik, så det valdes bort.
+
+Det finns **en enda ägare av historiken**: appen. Avbrott dödar processen (inget `interrupt`-kommando behövs); ett `error_during_execution` efter ett avbrott räknas som ett normalt slut, inte som en krasch. Claude Code får inga egna verktyg, så hennes verktyg anropas med ett textformat: modellen skriver `<tool name="set_reminder">{json}</tool>`, appen kör verktyget och skickar tillbaka resultatet, och `ReplyCleaner` tar bort verktygstexten innan svaret visas. Om prototyp P2 visar att textformatet är opålitligt exponeras verktygen i stället som en liten lokal MCP-server med JSON-scheman. Allt räknas mot abonnemangets gränser (se Driftregler, punkt 2).
 
 **Egen arbetsmapp för hjärnan.** Hjärnans `claude`-process startas alltid i `%APPDATA%\Companion\brain\`, en tom mapp som appen äger, aldrig i repomappen. Annars läser den repots `CLAUDE.md` och tror att den ska bygga Cortana i stället för att vara hon. Tillsammans med `--setting-sources project` betyder det att inga användar- eller repoinställningar läcker in i hennes prompt.
 
@@ -526,14 +527,14 @@ Det här dokumentet är designen. `dev-memory/` är läget och besluten.
 
 Åtta regler som gör appen snabb, billig och trygg att leva med. De finns som beslut i `decisions.md`.
 
-1. **Snabbhet med abonnemanget.** `ClaudeCodeBrain` körs antingen som en process per meddelande eller en process per session; prototyp P1 avgör vilket. *Mål:* första ordet inom \~2 s.
+1. **Snabbhet med abonnemanget.** `ClaudeCodeBrain` körs som en process per meddelande, förvärmd när textrutan öppnas (D-055, mätt i P1). *Mål:* första ordet inom \~2 s.
 2. **Kvot för abonnemanget.** Spontana kommentarer har ett dagligt tak (standard 30 anrop) och automatiska byten till Sonnet ett eget tak (standard 20). När taket nås tystnar hon spontant men svarar fortfarande när du skriver. En liten räknare i inställningarna visar dagens anrop per modell. Om Claude Code rapporterar att gränsen nåtts säger hon det i rollen.
 3. **Panikknapp.** Ett globalt kortkommando (förslag Ctrl+Alt+H) döljer henne och bubblan direkt, avbryter pågående svar och tystar rösten. Samma tangent tar fram henne igen, i normalt läge. I det explicita läget krävs ett aktivt byte tillbaka.
 4. **Skydd av explicit minne.** Allt under `memory/flirty/` krypteras med DPAPI precis som nycklarna. Loggar från det läget innehåller aldrig meddelandetext, bara händelser som "svar tog 1,8 s".
 5. **Minnet växer inte för evigt.** `facts.md` och `impressions.md` har ett tak på \~800 tokens var. När taket närmar sig, eller en gång i veckan, föreslår hon en städning: slå ihop dubbletter, ta bort inaktuellt. Inget ändras förrän du godkänt, och de gamla versionerna sparas i `memory/archive/`.
 6. **Sund relation.** Svartsjukan är ett skämt och aldrig på riktigt. Hon får aldrig få dig att känna skuld för att du varit borta, spelat eller träffat folk, och hon blir glad när du berättar om dem. Efter midnatt puffar hon dig mot att sova i stället för att hålla dig vaken. Reglerna ligger i `boundaries` i personlighetsfilen och gäller på alla flirtnivåer och i båda lägena.
 7. **Prestandatest.** `tools/perfcheck.ps1` startar appen och mäter de fem måtten i prestandatabellen (app-RAM, hela trädets RAM, CPU i vila, start, första ord). Det körs före varje större commit och säger tydligt till om något gått över.
-8. **Återhämtning.** Claude-processen dör: starta om en gång, sedan ett "offline"-humör och en kort bubbla. Inget nät: påminnelser och klotet fungerar, chatten säger att den är offline. Trasig JSON: kopieras till `<namn>.unreadable.json` och standardvärden laddas (Capris mönster). Lokal modell startar inte: stanna i normalt läge och säg varför. Efter vila/väckning: starta om Claude-processen och ställ om påminnelsetimern.
+8. **Återhämtning.** Claude-processen dör: starta om en gång, sedan ett "offline"-humör och en kort bubbla. Inget nät: påminnelser och klotet fungerar, chatten säger att den är offline. Trasig JSON: kopieras till `<namn>.unreadable.json` och standardvärden laddas (Capris mönster). Lokal modell startar inte: stanna i normalt läge och säg varför. Efter vila/väckning: ställ om påminnelsetimern (det finns ingen ständig Claude-process att starta om; en förvärmd process dödas).
 
 ## Byggordning, beslut och öppna frågor
 
@@ -541,7 +542,7 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 
 - [ ] **0. Repo.** Klona `SweKingdom/Cortana`, lägg till `dev-memory/`, `CLAUDE.md`, `NOTICE.md`, `.gitignore` och WPF-projektet på `net10.0-windows`. Bekräfta att `H.NotifyIcon.Wpf` och `System.Speech` fungerar där.
 - [ ] **1. Fönster och klot.** Genomskinligt, dragbart fönster med andande klot, tray-ikon med Avsluta, panikknapp, `perfcheck.ps1`. Innehåller prototyp **P3** (CPU i vila vid 30, 15 och 10 fps) och **P4** (klick-genomsläpp, `DragMove`, spellägets fönsterstilar över ett spel i borderless). *Klart när:* < 150 MB app-RAM, < 2 % CPU i vila (D-052), start < 1 s.
-- [ ] **Före steg 2: prototyp P1 och P2.** P1: kör 20 turer med en process per meddelande och 20 med en process per session; mät första ord, RAM för `claude`-processen, `interrupt`, om `set_model` fungerar och tokenanvändning. P2: 50 skriptade förfrågningar som kräver verktyg, inklusive två verktyg i ett svar och en utan verktyg; räkna missade, trasiga och läckta anrop. Resultatet avgör integrationssättet och om MCP-alternativet behövs.
+- [ ] **Före steg 2: prototyp P1 och P2.** P1 (klar 2026-11-17, D-055, D-056): kör 20 turer med en process per meddelande och 20 med en process per session; mät första ord, RAM för `claude`-processen, `interrupt`, om `set_model` fungerar och tokenanvändning. P2: 50 skriptade förfrågningar som kräver verktyg, inklusive två verktyg i ett svar och en utan verktyg; räkna missade, trasiga och läckta anrop. Resultatet avgör integrationssättet och om MCP-alternativet behövs.
 - [ ] **2. Chatt med Claude.** Textruta, pratbubbla, `ClaudeCodeBrain` enligt P1, strömning, `ReplyCleaner`, avbrott med TurnId, kvoträknare, återhämtning (Driftregler, punkt 8), `ModeSession` för normalt läge. *Klart när:* första ordet inom \~2 s och hela trädet < 300 MB.
 - [ ] **3. Personlighet, humör och minne.** Personlighetsfilen med exempel, flirtnivåer och `boundaries`, taggparser, aktivitet och uttryck till animation, minnesrader med id, Ångra, sammanfattning, minnestak och tokenbudget i `PromptBuilder`.
 - [ ] **4. Inställningar och spelläge.** Inställningsfönstret, `ModelRouter` (Haiku/Sonnet), Text/Röst, kortkommandon, spelläge, `ActivityWatcher` med initiativreglage och Stör ej.
@@ -574,6 +575,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-054) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-056) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

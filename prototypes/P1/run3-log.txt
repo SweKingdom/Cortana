@@ -1,0 +1,35 @@
+claude 2.1.318 (Claude Code)
+== Mode W: pre-warm, 3 s typing
+  W turn  1: init=64 first=558 total=1011 ram=360MB/2p in=2 cc=1039 cr=0 out=53 model=claude-haiku-5-5 
+  W turn  2: init=46 first=602 total=1139 ram=399MB/2p in=2 cc=1118 cr=0 out=80 model=claude-haiku-5-5 
+  W turn  3: init=37 first=631 total=1200 ram=373MB/2p in=2 cc=1222 cr=0 out=77 model=claude-haiku-5-5 
+  W turn  4: init=37 first=673 total=1266 ram=379MB/2p in=2 cc=1319 cr=0 out=112 model=claude-haiku-5-5 
+  W turn  5: init=35 first=880 total=1238 ram=391MB/2p in=2 cc=1423 cr=0 out=140 model=claude-haiku-5-5 
+  W turn  6: init=30 first=797 total=1272 ram=378MB/2p in=2 cc=1503 cr=0 out=109 model=claude-haiku-5-5 
+  W turn  7: init=28 first=886 total=1563 ram=386MB/2p in=2 cc=1584 cr=0 out=126 model=claude-haiku-5-5 
+  W turn  8: init=30 first=787 total=1317 ram=389MB/2p in=2 cc=1685 cr=0 out=138 model=claude-haiku-5-5 
+  W turn  9: init=31 first=1131 total=1607 ram=398MB/2p in=2 cc=1778 cr=0 out=179 model=claude-haiku-5-5 
+  W turn 10: init=36 first=1544 total=2172 ram=398MB/2p in=2 cc=1882 cr=0 out=309 model=claude-haiku-5-5 
+== Mode T: thinking disabled via MAX_THINKING_TOKENS=0, long prompt
+  T nothink  1: init=853 first=2345 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 
+  T nothink  2: init=876 first=9292 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 
+  T nothink  3: init=926 first=10377 total= ram=0MB/0p in= cc= cr= out= model=claude-haiku-5-5 
+turns.csv written to C:\Users\phili\VSCode\Cortana\prototypes\P1\bin\Release\net10.0\
+
+## Summary (median / p90 / max)
+W: turns=10 fails_in_20_turns=0
+  first word ms (turns 1-20): 787 / 1131 / 1544
+  spawn-to-init ms: 35 / 46 / 64
+  total turn ms: 1266 / 1607 / 2172
+  claude tree RAM MB: 386 / 398 / 399  procs: 2
+  tokens at turn 1/5/10/15/20 (in+cache_create+cache_read -> total input; out):
+    t 1: in=2 cc=1039 cr=0 total_in=1041 out=53 cost=$0,00023
+    t 5: in=2 cc=1423 cr=0 total_in=1425 out=140 cost=$0,00035
+    t10: in=2 cc=1882 cr=0 total_in=1884 out=309 cost=$0,00084
+  totals over 20 turns: total_in=14573 fresh(in+cc)=14573 cache_read=0 out=1323 cost=$0,0047 (B cost is cumulative per session: last value)
+  working set MB: 197 / 199 / 200
+
+## Interrupt / set_model rows
+  T nothink 1: first=2345 total= model=claude-haiku-5-5 block=thinking  ENDED
+  T nothink 2: first=9292 total= model=claude-haiku-5-5 block=thinking  ENDED
+  T nothink 3: first=10377 total= model=claude-haiku-5-5 block=thinking  ENDED

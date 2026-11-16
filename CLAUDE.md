@@ -35,6 +35,15 @@ This repo is Cortana Desktop: a private, lightweight Windows desktop AI companio
 - Build and run on Windows (PowerShell). Report done criteria with numbers from
   `tools/perfcheck.ps1`. Philip judges anything visual himself.
 
+## Git and branches
+
+- Each step (or prototype) gets its own branch, `step-N-<short-name>` or `pN-<short-name>`.
+- At the end of a step: push the branch to origin and open a pull request with `gh pr create`.
+  The PR has a short description and the `tools/perfcheck.ps1` numbers (for prototypes: their
+  measurements). Never merge locally and never push to `main`. Philip merges on GitHub.
+- Commit and push only when Philip has approved the end-of-session changes. Delete a local
+  branch only after Philip says its PR is merged.
+
 ## End of session
 
 - Propose updates to the three dev-memory files: new or superseded decisions,

@@ -9,11 +9,10 @@ Owns next steps and blockers. Done criteria are measured with tools/perfcheck.ps
       Measured (median of 3, 10 fps, software): private bytes 75.4 MB, idle CPU 1.30%, start to orb 507 ms; tree 75.4 MB. After the smoothing follow-up (D-054, amplitude 1.14 + glow pulse): 75.7 MB, 1.38%, 511 ms.
 - [ ] **P4 game test (Philip):** orb stays on top of Overwatch/Minecraft in Borderless Windowed, click-through reaches the game, No-focus keeps game focus. Steps in prototypes/P4/README.md. Drag, panic hotkey, tray menu, position restore and single instance already confirmed by Philip.
 - [ ] **Later (step 3/4):** thinking/talking at 30 fps and sleeping/game mode = no animation (D-051); only idle and hidden/locked exist so far.
-- [ ] **Before step 2: prototypes P1 and P2.**
-      P1: 20 turns one-process-per-message vs 20 turns one-process-per-session; measure first word, claude process RAM, interrupt, whether set_model works, token growth. Decides D-037.
-      P2: 50 scripted tool requests (incl. two tools in one reply, and none); count missed, malformed and leaked calls. If more than a few percent fail, try a local MCP server instead.
-- [ ] **2. Chat with Claude**: text box, speech bubble, ClaudeCodeBrain per P1, streaming, ReplyCleaner, TurnId on reply events (D-038), quota counter (D-029), recovery rules (D-047), ModeSession for normal mode (D-041).
-      Done when: first word ~2 s, whole tree <300 MB.
+- [x] **P1 (done 2026-11-17, branch p1-claude-process-modes):** one `claude` process per message vs per session on Claude Code 2.1.318. Result: one process per message with pre-warm (D-055). Per message: first word 1925 ms median, 0 failures in 20 turns; pre-warmed with 3 s typing: 787 ms median / 1131 p90 (10 turns); per session: 500 ms but ~435 MB `claude` RAM at rest. Interrupt and `set_model` work in both. Details in prototypes/P1/results.md.
+- [ ] **P2:** 50 scripted tool requests (incl. two tools in one reply, and none); count missed, malformed and leaked calls. If more than a few percent fail, try a local MCP server instead. The Haiku thinking switch (D-055) is also still to settle, in step 2 at the latest.
+- [ ] **2. Chat with Claude**: text box, speech bubble, ClaudeCodeBrain one process per message with pre-warm (D-055), streaming, ReplyCleaner, TurnId on reply events (D-038), quota counter (D-029), recovery rules (D-047), ModeSession for normal mode (D-041).
+      Done when: first word ~2 s, whole tree <300 MB at rest (D-056; ~480 MB while a claude process runs, reported separately).
 - [ ] **3. Personality, mood and memory**: personality file with examples, flirt levels and boundaries (D-033), tag parser, Activity + Expression animation (D-043), memory lines with id/date/source and Undo (D-042), summary, memory caps (D-032), PromptBuilder token budget.
 - [ ] **4. Settings and game mode**: settings window, ModelRouter (D-013), Text/Voice toggle, hotkeys, game mode (D-014), ActivityWatcher with frequency slider, Do-not-disturb and suppression rules (D-046).
 - [ ] **5. Tools**: reminders/timers, open app/site, the five tool rules (D-045), yes/no confirmations showing exact args.
@@ -22,4 +21,4 @@ Owns next steps and blockers. Done criteria are measured with tools/perfcheck.ps
 
 ## Blockers
 
-- None for steps 0–1. Step 2 waits on P1 and P2.
+- None for steps 0–1. Step 2 waits on P2.
