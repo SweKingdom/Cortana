@@ -46,3 +46,16 @@ Rules:
 - Uncertain: nothing new. D-049 (package versions, .sln) skipped by Philip; versions live in the .csproj.
 - Last confirmed action: Philip approved the dev-memory updates, doc fixes and date correction, and asked for commit, merge to main and push.
 - Next: step 1 (window and orb, P3/P4).
+
+## 2026-11-16 — step 1, window and orb (Claude, approved by Philip)
+
+- Branch: step-1-window-orb, committed, merged into main and pushed at Philip's instruction (see git log for the commit).
+- Added: Character/ (CharacterWindow, OrbControl, OrbVisual, OrbAnimator), Core/ (Settings, GlobalHotkey), Native/NativeMethods.cs, app.manifest (Per Monitor V2), tray icon, tools/perfcheck.ps1, prototypes/P3, P3b, P4. Removed the step 0 placeholder MainWindow. Window is 168x168 with a 152 px invisible grab ring; the glow ends at the ring so nothing outside it swallows clicks.
+- Decisions: D-049 grab ring; D-050 software rendering default; D-051 animation by activity (supersedes D-006); D-052 budget with idle CPU <2% (supersedes D-040); D-053 panic hotkey Ctrl+Alt+H. The ID D-049 was earlier mentioned as skipped (package versions, .sln) but never written, so it is now the grab ring.
+- Measured (perfcheck, median of 3, 10 fps, software rendering): private bytes 75.4 MB (limit 150), idle CPU 1.30% (limit 2%), start to orb 507 ms (limit 1 s), tree 75.4 MB. First word n/a until step 2.
+- Findings: a bare WPF window is ~395 MB private with hardware rendering on this PC (GPU driver) and ~65 MB in software. No frame rate gets idle CPU under 0.5% with a continuously breathing orb (P3). Pre-rendered bitmaps with a timer (P3b) were no cheaper (1.64% vs 1.77%, noise) and used ~10 MB more, so the Storyboard was kept. First breathing bug: animating the ScaleTransform object directly did nothing; animating via the element's property path works.
+- Confirmed by Philip by hand: drag, Ctrl+Alt+H, tray menu, position restore, single instance. Not done: P4 game test (checklist item left open).
+- Uncertain: behaviour over a borderless game (P4); thinking/talking 30 fps and sleeping/game-mode stop are only decided, not built (steps 3 and 4); the memory result depends on this PC's GPU driver; GPU/dwm cost is not measured by D-052; saved window positions from before the resize may sit slightly off.
+- Design changed: docs/architecture.md was updated (CPU budget, window size, software rendering, animation by activity, grab ring, P3b note, project tree, D-053 reference). Philip updates the claude.ai doc to match.
+- Last confirmed action: Philip decided D-050 to D-053 and asked for the doc updates, commit, merge and push.
+- Next: P4 game test (Philip), then prototypes P1 and P2, then step 2.

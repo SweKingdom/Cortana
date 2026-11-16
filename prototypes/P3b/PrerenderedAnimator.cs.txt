@@ -1,0 +1,64 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+
+namespace Companion.Character;
+
+/// <summary>
+/// P3b variant: the breathing cycle is rendered once into cached bitmaps (one set per key, created
+/// on demand) and a timer swaps the Image source.
+/// </summary>
+public sealed class PrerenderedAnimator : IOrbPlayer
+{
+    private const int FrameCount = 40; // 40 frames at 10 fps = the 4 s cycle
+
+    private readonly Image _image;
+    private readonly Dictionary<string, BitmapSource[]> _sets = new();
+    private readonly DispatcherTimer _timer;
+    private BitmapSource[]? _frames;
+    private int _index;
+
+    internal PrerenderedAnimator(Image image)
+    {
+        _image = image;
+        _timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(1000.0 / (OrbAnimator.FpsOverride() ?? OrbAnimator.DefaultFps)) };
+        _timer.Tick += (_, _) =>
+        {
+            if (_frames is null) return;
+            _index = (_index + 1) % _frames.Length;
+            _image.Source = _frames[_index];
+        };
+    }
+
+    private BitmapSource[] GetFrames(string key)
+    {
+        if (_sets.TryGetValue(key, out var set)) return set;
+        double dpi = 96 * VisualTreeHelper.GetDpi(_image).DpiScaleX;
+        int px = (int)Math.Ceiling(OrbVisual.Size * dpi / 96);
+        set = new BitmapSource[FrameCount];
+        for (int i = 0; i < FrameCount; i++)
+        {
+            double eased = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / FrameCount); // 0 -> 1 -> 0
+            var vis = OrbVisual.Build(1 + (OrbVisual.MaxScale - 1) * eased);
+            vis.Measure(new Size(OrbVisual.Size, OrbVisual.Size));
+            vis.Arrange(new Rect(0, 0, OrbVisual.Size, OrbVisual.Size));
+            vis.UpdateLayout();
+            var rtb = new RenderTargetBitmap(px, px, dpi, dpi, PixelFormats.Pbgra32);
+            rtb.Render(vis);
+            rtb.Freeze();
+            set[i] = rtb;
+        }
+        return _sets[key] = set;
+    }
+
+    public void Start()
+    {
+        _frames = GetFrames("idle");
+        _image.Source = _frames[_index];
+        _timer.Start();
+    }
+
+    public void Pause() => _timer.Stop();
+}

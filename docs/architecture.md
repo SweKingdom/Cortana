@@ -13,7 +13,7 @@ En privat skrivbordskompanjon i C# + WPF (.NET 10 LTS) som gör det Capri gör m
 | App-RAM | Private bytes för `Companion.exe` efter 60 s i vila | < 150 MB | < 150 MB |
 | Hela trädets RAM | Appen + alla `claude`-processer, i vila, redovisas separat | < 300 MB | appen + modellservern; modellen ligger på grafikkortet |
 | VRAM | Aktivitetshanteraren, dedikerat GPU-minne | \~0 | ≤ 4–5 GB |
-| CPU i vila | Snitt över 60 s efter 30 s, klotet andas | < 0,5 % av en kärna | samma |
+| CPU i vila | Snitt över 60 s efter 30 s, klotet andas | < 2 % av en kärna (median av 3 körningar, D-052) | samma |
 | Start till synligt klot | Processtart till första ritade bild | < 1 s | < 1 s (modellen laddas först vid lägesbyte) |
 | Tid till första ord | Enter till första tecknet i bubblan | \~2 s | mäts när läget byggs |
 
@@ -162,9 +162,14 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       GameMode.cs          upptäcker spel i förgrunden, slår på spelläge
       ActivityWatcher.cs   fönsterbyten (bara programnamn) -> spontana kommentarer
       Quota.cs             dagliga tak och räknare för abonnemanget
+      GlobalHotkey.cs      RegisterHotKey på ett dolt meddelandefönster (panik nu, chatt i steg 2)
+    Native/
+      NativeMethods.cs     de få P/Invoke-anropen (fönsterstilar, hotkey, skärmkontroll)
     Character/
-      CharacterWindow.xaml genomskinligt fönster, drag, klick-genomsläpp
-      OrbAnimator.cs       klotet: färg, puls, partiklar per humör
+      CharacterWindow.xaml genomskinligt fönster, drag, greppring, klick-genomsläpp
+      OrbControl.xaml      greppringen och värdytan för klotet
+      OrbVisual.cs         ritar klotet (sken + kärna) i en given skala; enda källan till utseendet
+      OrbAnimator.cs       klotet: andning (idle); färg, puls, partiklar per humör kommer i steg 3
       SpriteAnimator.cs    (senare) sprite sheets, samma gränssnitt
       SpeechBubble.xaml    pratbubbla, Ja/Nej- och Ångra-knappar
       ChatInput.xaml       textruta (klick eller kortkommando)
@@ -272,22 +277,26 @@ Bussen är en vanlig klass med `Publish<T>` och `Subscribe<T>`. Alla UI-uppdater
 
 ## Fönster och rendering
 
-Karaktären bor i ett litet WPF-fönster på ungefär 220 × 260 px. Det är inte helskärm, och det är den största enskilda besparingen för både RAM och GPU.
+Karaktären bor i ett litet WPF-fönster på 168 × 168 px (greppringen 152 px gånger andningens 1,08 plus marginal). Det är inte helskärm, och det är den största enskilda besparingen för både RAM och GPU. Pratbubblan och textrutan är egna fönster, så fönstret behöver inte rymma dem.
+
+**Mjukvarurendering (D-050).** Appen kör WPF i `RenderMode.SoftwareOnly` som standard. På Philips dator kostar hårdvarurendering ~330 MB privata bytes via grafikdrivrutinen (ett tomt WPF-fönster: 395 MB mot 65 MB), medan det lilla klotet är billigt att rita i mjukvara. Utvecklarbrytare: `COMPANION_RENDER=hardware` slår av det.
 
 **Fönstret:**
 
 - `WindowStyle=None`, `AllowsTransparency=True`, `Background=Transparent`, `Topmost=True`, `ShowInTaskbar=False`.
-- Klick släpps igenom där fönstret är helt genomskinligt, eftersom WPF:s layered windows gör träfftest per pixel. Ytan runt klotet får därför `Background={x:Null}`, inte en nästan genomskinlig färg.
+- Klick släpps igenom där fönstret är helt genomskinligt, eftersom WPF:s layered windows gör träfftest per pixel. Ytan runt klotet får därför `Background={x:Null}`, inte en nästan genomskinlig färg. Undantaget är en osynlig **greppring** (D-049): en ellips ca 24 px bredare än klotet på varje sida med fyllning alfa 1/255, så att man kan ta tag strax utanför klotet. Ringen skalas inte av andningen och blir också klick-genomsläpplig när "Klick-genomsläpp" är på i tray-menyn. Skenet runt klotet slutar i ringens kant (dess alfa är 0 från 92 % av radien), så ingenting utanför ringen tar emot klick.
 - Läget "klick-genomsläpp överallt" (för spel och fullskärm) sätts med `WS_EX_TRANSPARENT` via `SetWindowLong` och slås på automatiskt i spelläge och kan också slås av och på från tray-menyn.
 - Dra med `DragMove()` på vänsterklick. Positionen sparas i `settings.json` och kontrolleras mot skärmarna vid start, ifall en skärm har kopplats bort. Appen är per-monitor-DPI-medveten (Per Monitor V2 i app.manifest) och kontrollerar positionen igen när skärmar ändras.
 - `WS_EX_TOOLWINDOW` döljer fönstret från Alt+Tab.
 
 **Animation utan loop:**
 
-- Klotet består av några `Ellipse` med `RadialGradientBrush`. Skenet görs med en större, suddig ellips. Undvik `DropShadowEffect`, som är dyr att rita om.
-- Varje humör är en `Storyboard` (färg, skala, opacitet). WPF:s kompositor driver dem, så det finns ingen egen timer och ingen `CompositionTarget.Rendering`.
-- Animationerna körs med `Timeline.DesiredFrameRate=30`. Det räcker för mjuk andning och halverar GPU-arbetet jämfört med 60.
-- I `sleeping` och när fönstret är dolt eller skärmen låst stoppas alla storyboards helt (`SessionSwitch`-händelsen). Då ritas noll bilder.
+- Klotet består av två `Ellipse` (sken och kärna) med `RadialGradientBrush`, byggda av `OrbVisual`. Skenet är en ellips lika stor som greppringen vars gradient tonar ut till alfa 0 (ingen `BlurEffect`, ingen `DropShadowEffect`: båda ritas om dyrt när de animeras).
+- Varje humör är en `Storyboard`. WPF:s kompositor driver dem, så det finns ingen egen timer och ingen `CompositionTarget.Rendering`. Animeringen går via elementets egenskapssökväg (`(UIElement.RenderTransform).(ScaleTransform.ScaleX)`); att peka på själva `ScaleTransform`-objektet gav ingen effekt.
+- **Bildfrekvens efter aktivitet (D-051):** idle = bara skala (andning, 4 s) med `Timeline.DesiredFrameRate=10`; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst; thinking/talking kommer i steg 3, sleeping och spelläge i steg 4.
+- När fönstret är dolt (panikknappen) eller skärmen låst (`SessionSwitch`) stoppas storyboarden helt. Då ritas noll bilder.
+- Prövat och förkastat (P3b): att förrendera andningscykeln till ~40 bitmaps och byta bild med en timer gav ingen märkbar vinst (1,64 mot 1,77 % CPU, inom mätbruset) men ~10 MB mer RAM, en timer och DPI-problem. Koden finns kvar i `prototypes/P3b/`.
+- Dev-brytare, bara för mätning: `COMPANION_FPS`, `COMPANION_RENDER`, `COMPANION_PERF_FILE` (se README.md).
 - Version 2 med sprites använder en `DispatcherTimer` som bara går medan en animation spelas och visar `CroppedBitmap`-rutor från ett förladdat ark.
 
 **Pratbubblan** är ett eget litet `Popup`-fönster ovanför klotet. Den växer med texten upp till \~320 px bred, scrollar vid långa svar och tonar ut efter `max(6 s, 60 ms per tecken)`. Bubblan finns bara medan den visas.
@@ -530,7 +539,7 @@ Det här dokumentet är designen. `dev-memory/` är läget och besluten.
 Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Varje steg avslutas med `tools/perfcheck.ps1` mot budgeten. Checklistan med status finns i `dev-memory/checklist.md`.
 
 - [ ] **0. Repo.** Klona `SweKingdom/Cortana`, lägg till `dev-memory/`, `CLAUDE.md`, `NOTICE.md`, `.gitignore` och WPF-projektet på `net10.0-windows`. Bekräfta att `H.NotifyIcon.Wpf` och `System.Speech` fungerar där.
-- [ ] **1. Fönster och klot.** Genomskinligt, dragbart fönster med andande klot, tray-ikon med Avsluta, panikknapp, `perfcheck.ps1`. Innehåller prototyp **P3** (CPU i vila vid 30, 15 och 10 fps) och **P4** (klick-genomsläpp, `DragMove`, spellägets fönsterstilar över ett spel i borderless). *Klart när:* < 150 MB app-RAM, < 0,5 % CPU i vila, start < 1 s.
+- [ ] **1. Fönster och klot.** Genomskinligt, dragbart fönster med andande klot, tray-ikon med Avsluta, panikknapp, `perfcheck.ps1`. Innehåller prototyp **P3** (CPU i vila vid 30, 15 och 10 fps) och **P4** (klick-genomsläpp, `DragMove`, spellägets fönsterstilar över ett spel i borderless). *Klart när:* < 150 MB app-RAM, < 2 % CPU i vila (D-052), start < 1 s.
 - [ ] **Före steg 2: prototyp P1 och P2.** P1: kör 20 turer med en process per meddelande och 20 med en process per session; mät första ord, RAM för `claude`-processen, `interrupt`, om `set_model` fungerar och tokenanvändning. P2: 50 skriptade förfrågningar som kräver verktyg, inklusive två verktyg i ett svar och en utan verktyg; räkna missade, trasiga och läckta anrop. Resultatet avgör integrationssättet och om MCP-alternativet behövs.
 - [ ] **2. Chatt med Claude.** Textruta, pratbubbla, `ClaudeCodeBrain` enligt P1, strömning, `ReplyCleaner`, avbrott med TurnId, kvoträknare, återhämtning (Driftregler, punkt 8), `ModeSession` för normalt läge. *Klart när:* första ordet inom \~2 s och hela trädet < 300 MB.
 - [ ] **3. Personlighet, humör och minne.** Personlighetsfilen med exempel, flirtnivåer och `boundaries`, taggparser, aktivitet och uttryck till animation, minnesrader med id, Ångra, sammanfattning, minnestak och tokenbudget i `PromptBuilder`.
@@ -564,6 +573,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-048) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-053) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

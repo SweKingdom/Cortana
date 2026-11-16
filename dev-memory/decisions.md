@@ -16,7 +16,7 @@ Rules:
 | D-003 | 2026-11-13 | Character: Cortana-inspired personality, v1 look is a code-drawn glowing orb | Private project, max ~2 people originally | ACCEPTED |
 | D-004 | 2026-11-13 | Never publish with the Cortana name or any Halo audio/lines/art | Microsoft IP | ACCEPTED |
 | D-005 | 2026-11-13 | Modules talk only through an event bus; interfaces IBrain, ITool, IVoice, IAnimator | Swap parts without touching others | SUPERSEDED by D-038 |
-| D-006 | 2026-11-13 | Animation via WPF Storyboards at 30 fps, stopped when hidden/sleeping/locked; no render loop | ~0% idle CPU | ACCEPTED |
+| D-006 | 2026-11-13 | Animation via WPF Storyboards at 30 fps, stopped when hidden/sleeping/locked; no render loop | ~0% idle CPU | SUPERSEDED by D-051 |
 | D-007 | 2026-11-13 | Default brain: free Gemini key | Free, light | SUPERSEDED by D-012 |
 | D-008 | 2026-11-16 | Two modes: normal and explicit, each with own personality, brain and memory folder | Claude/Gemini don't allow explicit content | ACCEPTED |
 | D-009 | 2026-11-16 | Explicit mode via hosted Venice/OpenRouter | Keep PC free | SUPERSEDED by D-010 |
@@ -50,7 +50,7 @@ Rules:
 | D-037 | 2026-11-16 | ClaudeCodeBrain runs either one process per message or one per session, chosen by prototype P1; never mixed; exactly one owner of conversation history. Supersedes D-028 | Persistent process unproven (Capri uses one per call) and clashes with app-owned history | ACCEPTED |
 | D-038 | 2026-11-16 | Commands are direct calls (Conversation -> IBrain, ToolRegistry); notifications go on the bus. Reply events carry an integer TurnId; stale turns are dropped. Supersedes D-005 | Clear rule; no stale chunks after interrupt | ACCEPTED |
 | D-039 | 2026-11-16 | Explicit-mode trust boundary in code: loopback-only brain URLs, Windows voice only, no cloud tools, leak test counts outbound non-loopback requests (must be 0), no full crash dumps. Threat model: single-user PC; PIN is a privacy latch, not a security boundary | Make "explicit stays local" enforceable | ACCEPTED |
-| D-040 | 2026-11-16 | Performance budget = 5 metrics: app private bytes <150 MB, whole tree incl. claude <300 MB (reported separately), idle CPU <0.5% of one core over 60 s, start to orb <1 s, first word ~2 s; first audio added at step 6. perfcheck.ps1 measures these. Supersedes D-002, D-034 | Unambiguous measurement | ACCEPTED |
+| D-040 | 2026-11-16 | Performance budget = 5 metrics: app private bytes <150 MB, whole tree incl. claude <300 MB (reported separately), idle CPU <0.5% of one core over 60 s, start to orb <1 s, first word ~2 s; first audio added at step 6. perfcheck.ps1 measures these. Supersedes D-002, D-034 | Unambiguous measurement | SUPERSEDED by D-052 |
 | D-041 | 2026-11-16 | Each mode is a disposable ModeSession (brain, memory, conversation, voice); switching = cancel turn, stop voice, dispose, create new | Nothing survives a switch | ACCEPTED |
 | D-042 | 2026-11-16 | Memory lines: `- [id \| date \| source] text`, corrections as new lines with `replaces id`; preferences under `## Preferences` in facts.md; PromptBuilder budget ~3,000 tokens (chars/4), trims oldest verbatim messages first, never personality. No confidence or expiry fields | Unbounded verbatim messages; traceable corrections | ACCEPTED |
 | D-043 | 2026-11-16 | Mood is two dimensions: Activity (app: idle, thinking, talking, sleeping) drives motion; Expression (tag: happy, teasing, flirty, concerned) drives color | They were mixed | ACCEPTED |
@@ -59,10 +59,15 @@ Rules:
 | D-046 | 2026-11-16 | Proactive comments also suppressed by: tray Do-not-disturb, Windows presentation/busy/Focus Assist state, input in last ~5 s, exclude list (Teams, Zoom). Refines D-018 | Avoid being annoying | ACCEPTED |
 | D-047 | 2026-11-16 | IVoice.Level optional; Windows voice drives orb pulse from VisemeReached; recovery rules (restart claude once, offline mood, corrupt JSON -> .unreadable copy + defaults, restart claude and re-arm timer after wake); Per Monitor V2 DPI | Gaps found in counter-review | ACCEPTED |
 | D-048 | 2026-11-16 | The app's own `claude` brain process always runs in `%APPDATA%\Companion\brain\` (empty, app-owned), never in the repo | Otherwise it reads the repo's CLAUDE.md and acts as the builder, not as her | ACCEPTED |
+| D-049 | 2026-11-16 | Grab ring: the window surround keeps `Background={x:Null}` (click-through), but an invisible ellipse about 24 px wider than the orb on every side (fill alpha 1/255) is the drag area, so Philip can grab just outside the orb. Tray Click-through (`WS_EX_TRANSPARENT`) makes the ring click-through too. The ring is not scaled by the breathing. Refines the window rule in the architecture doc | Only the orb itself was grabbable; alpha 1/255 keeps the pixels part of the window while invisible | ACCEPTED |
+| D-050 | 2026-11-16 | WPF software rendering is the app default (`RenderMode.SoftwareOnly`); dev hook `COMPANION_RENDER=hardware` turns it off. Replaces WPF's hardware default | P3: on this PC hardware rendering costs ~330 MB private bytes through the GPU driver path (bare window 395 MB vs 65 MB); the orb is small, so software drawing is cheap | ACCEPTED |
+| D-051 | 2026-11-16 | Animation by activity: idle = scale-only breathing at 10 fps; thinking and talking = full animation at 30 fps; sleeping, hidden, session-locked or game mode = no animation (zero frames). Still Storyboards, no render loop, no timer. Supersedes D-006. Step 1 implements idle and hidden/locked; thinking/talking arrive with step 3, sleeping and game mode with step 4 | P3: no frame rate meets 0.5% with a continuously breathing orb; scale-only is the cheapest variant; costly motion only while it carries meaning | ACCEPTED |
+| D-052 | 2026-11-16 | Performance budget (same five metrics as D-040) with idle CPU relaxed: app private bytes <150 MB, whole tree incl. claude <300 MB (reported separately), idle CPU **<2% of one core** (60 s average after 30 s, median of 3 runs), start to orb <1 s, first word ~2 s; first audio added at step 6. Supersedes D-040 | P3: 0.5% is unreachable with a visible idle animation (measured 1.3-1.8% at 10 fps); GPU/dwm cost is still not counted | ACCEPTED |
+| D-053 | 2026-11-16 | Panic hotkey is Ctrl+Alt+H (hard-coded until the step 4 settings tab). Closes the panic part of the open hotkey question; refines D-030 | Philip's choice after testing in step 1 | ACCEPTED |
 
 ## Open
 
-- Chat hotkey (suggested Ctrl+Alt+Space) and panic hotkey (suggested Ctrl+Alt+H)
+- Chat hotkey (suggested Ctrl+Alt+Space). The panic hotkey is decided in D-053
 - Exact quota numbers (defaults 30 proactive / 20 Sonnet per day are guesses)
 - Cloud voice provider (e.g. Fish Audio) and the voice itself, after the alpha voice
 - Which 3–4B local model (license must allow adult content: prefer Apache 2.0)
