@@ -70,3 +70,14 @@ Rules:
 - Design changed: docs/architecture.md updated (idle animation description, window size note, OrbTuning in the project tree, D-054 reference). Philip updates the claude.ai doc to match.
 - Last confirmed action: Philip chose option C and asked for the default, the decision, the constants file, removal of the temporary switches, a perfcheck run, then commit, merge and push.
 - Next: P4 game test (Philip), then prototypes P1 and P2, then step 2.
+
+## 2026-11-17 — prototype P1, Claude Code process mode (Claude, approved by Philip)
+
+- Branch: p1-claude-process-modes, pushed to origin with a pull request; Philip merges on GitHub (new rule in CLAUDE.md, replaces local merges). Deleted the merged local branches step-1-window-orb and step-1-orb-smoothing. Repo at start matched the last entry (main, f17aba1, clean).
+- Added: prototypes/P1/ (console harness, README, results.md, raw CSVs from two runs and the pre-warm run). Updated Claude Code 2.1.49 -> 2.1.318 (winget) before measuring; `--safe-mode`, `--system-prompt-file`, `--append-system-prompt-file`, `--disable-slash-commands`, `interrupt` and `set_model` all exist and work there.
+- Measured (Haiku, 20 turns each, two runs, 0 failures): first word per message 1925 ms median / 2565 p90 / 3004 max; per session 500 / 1121 / 1397; pre-warmed per message with 3 s of typing 787 / 1131 (10 turns). `claude` tree 400-440 MB private bytes (207-228 MB working set) in every mode; none at rest per message, ~435 MB at rest per session. Fresh input tokens over 20 turns 32 464 (per message) vs 3 107 plus 39 398 cache reads (per session). Interrupt 5/5 and `set_model` work in both.
+- Decisions: D-055 (one process per message, pre-warm, no extended thinking for Haiku, minimum version 2.1.318) and D-056 (tree limit applies at rest) accepted by Philip. D-037 stays ACCEPTED and is resolved by D-055.
+- Uncertain: no tested switch disables Haiku thinking (`MAX_THINKING_TOKENS=0`, `CLAUDE_CODE_DISABLE_THINKING=1`, `--thinking disabled`, `--effort low`, `alwaysThinkingEnabled=false` each still produced a thinking block on a 400-word prompt, one sample each); ordinary chat turns had none, so it may only matter for long creative prompts. Not measured: how the plan weighs fresh vs cached tokens (per-message mode sends about 10x more fresh input), pre-warm over longer chats, P2 tool reliability. P4 game test still open.
+- Design changed: docs/architecture.md updated (ClaudeCodeBrain process mode, pre-warm, flags and minimum version, interrupt, RAM at rest, P1 marked done, D-055/D-056). Philip updates the claude.ai doc to match.
+- Last confirmed action: Philip accepted D-055 and D-056, asked for the pre-warm measurement, the doc updates, a commit, and (per the new rule) a pushed branch with a pull request.
+- Next: P2 (tool-call reliability), P4 game test (Philip), then step 2.
