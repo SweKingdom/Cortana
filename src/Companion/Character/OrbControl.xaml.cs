@@ -9,7 +9,7 @@ public partial class OrbControl : UserControl
     public OrbControl()
     {
         InitializeComponent();
-        Host.Children.Add(OrbVisual.Build(1.0));
-        Animator = new OrbAnimator(Host);
+        Host.Children.Add(OrbVisual.Build(1.0, out var glow));
+        Animator = new OrbAnimator(Host, glow);
     }
 }

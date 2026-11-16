@@ -5,7 +5,7 @@
     <!-- The control and window surround keep Background=null: fully transparent pixels let clicks through.
          The only hit-testable area is the grab ring (D-049); the glow ends inside it. The orb is built by
          OrbVisual (single source for the look) and added to Host in code. -->
-    <Grid Background="{x:Null}">
+    <Grid Background="{x:Null}" UseLayoutRounding="False" SnapsToDevicePixels="False">
         <!-- Grab ring: 104 px core + 24 px each side, alpha 1/255 so it is invisible but still part of the window. -->
         <Ellipse Width="152" Height="152" Fill="#01000000" />
         <Grid x:Name="Host" Background="{x:Null}" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5" />

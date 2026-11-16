@@ -169,6 +169,7 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       CharacterWindow.xaml genomskinligt fönster, drag, greppring, klick-genomsläpp
       OrbControl.xaml      greppringen och värdytan för klotet
       OrbVisual.cs         ritar klotet (sken + kärna) i en given skala; enda källan till utseendet
+      OrbTuning.cs         andningens värden (fps, cykel, amplitud, glödens ljusstyrka) på ett ställe
       OrbAnimator.cs       klotet: andning (idle); färg, puls, partiklar per humör kommer i steg 3
       SpriteAnimator.cs    (senare) sprite sheets, samma gränssnitt
       SpeechBubble.xaml    pratbubbla, Ja/Nej- och Ångra-knappar
@@ -277,7 +278,7 @@ Bussen är en vanlig klass med `Publish<T>` och `Subscribe<T>`. Alla UI-uppdater
 
 ## Fönster och rendering
 
-Karaktären bor i ett litet WPF-fönster på 168 × 168 px (greppringen 152 px gånger andningens 1,08 plus marginal). Det är inte helskärm, och det är den största enskilda besparingen för både RAM och GPU. Pratbubblan och textrutan är egna fönster, så fönstret behöver inte rymma dem.
+Karaktären bor i ett litet WPF-fönster på 168 × 168 px (rymmer andningens största skala, se `OrbTuning`; glödens synliga radie är högst ca 80 px av 84). Det är inte helskärm, och det är den största enskilda besparingen för både RAM och GPU. Pratbubblan och textrutan är egna fönster, så fönstret behöver inte rymma dem.
 
 **Mjukvarurendering (D-050).** Appen kör WPF i `RenderMode.SoftwareOnly` som standard. På Philips dator kostar hårdvarurendering ~330 MB privata bytes via grafikdrivrutinen (ett tomt WPF-fönster: 395 MB mot 65 MB), medan det lilla klotet är billigt att rita i mjukvara. Utvecklarbrytare: `COMPANION_RENDER=hardware` slår av det.
 
@@ -293,7 +294,7 @@ Karaktären bor i ett litet WPF-fönster på 168 × 168 px (greppringen 152 px g
 
 - Klotet består av två `Ellipse` (sken och kärna) med `RadialGradientBrush`, byggda av `OrbVisual`. Skenet är en ellips lika stor som greppringen vars gradient tonar ut till alfa 0 (ingen `BlurEffect`, ingen `DropShadowEffect`: båda ritas om dyrt när de animeras).
 - Varje humör är en `Storyboard`. WPF:s kompositor driver dem, så det finns ingen egen timer och ingen `CompositionTarget.Rendering`. Animeringen går via elementets egenskapssökväg (`(UIElement.RenderTransform).(ScaleTransform.ScaleX)`); att peka på själva `ScaleTransform`-objektet gav ingen effekt.
-- **Bildfrekvens efter aktivitet (D-051):** idle = bara skala (andning, 4 s) med `Timeline.DesiredFrameRate=10`; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst; thinking/talking kommer i steg 3, sleeping och spelläge i steg 4.
+- **Bildfrekvens efter aktivitet (D-051):** idle = andning (skala 1,14 och glödens ljusstyrka 0,55-0,90 i takt, 4 s, sine ease in-out) med `Timeline.DesiredFrameRate=10` (D-054, värdena står som konstanter i `Character/OrbTuning.cs`); kantutjämning på bråkdelar av en pixel (`UseLayoutRounding` och `SnapsToDevicePixels` av) så att varje bildruta skiljer sig; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst; thinking/talking kommer i steg 3, sleeping och spelläge i steg 4.
 - När fönstret är dolt (panikknappen) eller skärmen låst (`SessionSwitch`) stoppas storyboarden helt. Då ritas noll bilder.
 - Prövat och förkastat (P3b): att förrendera andningscykeln till ~40 bitmaps och byta bild med en timer gav ingen märkbar vinst (1,64 mot 1,77 % CPU, inom mätbruset) men ~10 MB mer RAM, en timer och DPI-problem. Koden finns kvar i `prototypes/P3b/`.
 - Dev-brytare, bara för mätning: `COMPANION_FPS`, `COMPANION_RENDER`, `COMPANION_PERF_FILE` (se README.md).
@@ -573,6 +574,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-053) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-054) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

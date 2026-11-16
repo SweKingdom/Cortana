@@ -6,7 +6,7 @@ Owns next steps and blockers. Done criteria are measured with tools/perfcheck.ps
 - [x] **1. Window and orb**: done 2026-11-16 on branch step-1-window-orb. Transparent draggable always-on-top 168x168 window, scale-only breathing orb, grab ring (D-049), tray icon (Show/Hide, Click-through, No-focus test, Quit), panic hotkey Ctrl+Alt+H (D-053), perfcheck.ps1, Per Monitor V2 DPI (D-047), software rendering (D-050), first JSON file settings.json with `"version": 1` (D-044).
       Includes prototypes P3 (idle CPU at 30/15/10 fps, results in prototypes/P3/), P3b (pre-rendered frames, rejected, prototypes/P3b/) and P4 (click-through, DragMove, game-mode window styles).
       Done when (D-052): app <150 MB private bytes, idle CPU <2% of one core, start to orb <1 s.
-      Measured (median of 3, 10 fps, software): private bytes 75.4 MB, idle CPU 1.30%, start to orb 507 ms; tree 75.4 MB.
+      Measured (median of 3, 10 fps, software): private bytes 75.4 MB, idle CPU 1.30%, start to orb 507 ms; tree 75.4 MB. After the smoothing follow-up (D-054, amplitude 1.14 + glow pulse): 75.7 MB, 1.38%, 511 ms.
 - [ ] **P4 game test (Philip):** orb stays on top of Overwatch/Minecraft in Borderless Windowed, click-through reaches the game, No-focus keeps game focus. Steps in prototypes/P4/README.md. Drag, panic hotkey, tray menu, position restore and single instance already confirmed by Philip.
 - [ ] **Later (step 3/4):** thinking/talking at 30 fps and sleeping/game mode = no animation (D-051); only idle and hidden/locked exist so far.
 - [ ] **Before step 2: prototypes P1 and P2.**

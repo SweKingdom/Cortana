@@ -59,3 +59,14 @@ Rules:
 - Design changed: docs/architecture.md was updated (CPU budget, window size, software rendering, animation by activity, grab ring, P3b note, project tree, D-053 reference). Philip updates the claude.ai doc to match.
 - Last confirmed action: Philip decided D-050 to D-053 and asked for the doc updates, commit, merge and push.
 - Next: P4 game test (Philip), then prototypes P1 and P2, then step 2.
+
+## 2026-11-16 — step 1 follow-up, smoother breathing (Claude, approved by Philip)
+
+- Branch: step-1-orb-smoothing, committed, merged into main and pushed at Philip's instruction (see git log for the commit).
+- Problem: Philip saw only ~4 steps per half cycle at 10, 15 and 20 fps. Verified: COMPANION_FPS does change the rendered rate (10/15/20 distinct frames per second); the core radius moved only 4 px per half cycle and layout rounding/pixel snapping made the edge jump in whole pixels (4 distinct widths). Fix: rounding and snapping off, bigger amplitude, glow brightness pulse in sync (sine ease in-out was already in place).
+- Decision: D-054 refines D-051 (10 fps, amplitude 1.14, 4 s, glow opacity 0.55-0.90). Values are named constants in Character/OrbTuning.cs. Temporary switches COMPANION_AMP, COMPANION_GLOWPULSE, COMPANION_TICKS_FILE removed; COMPANION_FPS, COMPANION_RENDER and COMPANION_PERF_FILE stay (README).
+- Measured (perfcheck, median of 3, 10 fps, software): private bytes 75.7 MB, idle CPU 1.38% (limit 2%), start to orb 511 ms. Comparison table in prototypes/P3c/results.md. 15 fps cost 3.1% with the pulse (over budget) and its animation clock ticks ~54 times a second.
+- Uncertain: run-to-run CPU noise is ~0.4 points, so 1.38% leaves little margin under 2% when thinking/talking and other work is added later; P4 game test still open; whether 1.14 still looks right on other displays/DPI.
+- Design changed: docs/architecture.md updated (idle animation description, window size note, OrbTuning in the project tree, D-054 reference). Philip updates the claude.ai doc to match.
+- Last confirmed action: Philip chose option C and asked for the default, the decision, the constants file, removal of the temporary switches, a perfcheck run, then commit, merge and push.
+- Next: P4 game test (Philip), then prototypes P1 and P2, then step 2.

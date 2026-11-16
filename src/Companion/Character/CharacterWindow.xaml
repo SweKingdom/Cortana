@@ -5,7 +5,7 @@
         Title="Companion" Width="168" Height="168"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
-        UseLayoutRounding="True" SnapsToDevicePixels="True">
+        UseLayoutRounding="False" SnapsToDevicePixels="False">
     <!-- Surround must stay Background=null so fully transparent pixels let clicks through. -->
     <local:OrbControl x:Name="Orb" Background="{x:Null}" MouseLeftButtonDown="Orb_MouseLeftButtonDown" />
 </Window>
