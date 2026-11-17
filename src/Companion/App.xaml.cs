@@ -27,7 +27,8 @@ public partial class App : Application
     private CharacterWindow? _window;
     private TaskbarIcon? _tray;
     private GlobalHotkey? _hotkeys;
-    private bool _hotkeyFailureShown;
+    private EventBus? _bus;
+    private ChatController? _chat;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -60,10 +61,19 @@ public partial class App : Application
 
         // Tray and hotkey come after the orb is on screen so they never delay it.
         CreateTray();
+        // Chat (step 2): nothing starts here; the session and the windows are created on first use.
+        _bus = new EventBus();
+        _chat = new ChatController(_window, _bus, ephemeral: PerfProbe.Enabled);
+
         _hotkeys = new GlobalHotkey();
         // D-030: panic hotkey, suggested Ctrl+Alt+H (hard-coded until step 4 settings).
-        if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x48 /* H */, () => _window!.ToggleVisible()))
-            ShowHotkeyFailure();
+        if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x48 /* H */, TogglePanic))
+            ShowHotkeyFailure("Ctrl+Alt+H", "Use Show / Hide in the tray menu.");
+        // Chat hotkey (hard-coded until step 4 settings, like the panic key).
+        if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_SPACE, () => _chat!.OpenInput()))
+            ShowHotkeyFailure("Ctrl+Alt+Space", "Click the orb to chat.");
+
+        if (PerfProbe.Enabled) _ = PerfProbe.RunAsync(_chat);
 
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -72,7 +82,7 @@ public partial class App : Application
     private void CreateTray()
     {
         var showHide = new MenuItem { Header = "Show / Hide" };
-        showHide.Click += (_, _) => _window!.ToggleVisible();
+        showHide.Click += (_, _) => TogglePanic();
 
         var clickThrough = new MenuItem { Header = "Click-through", IsCheckable = true };
         clickThrough.Click += (_, _) => _window!.SetClickThrough(clickThrough.IsChecked);
@@ -107,12 +117,16 @@ public partial class App : Application
         _tray.ForceCreate(enablesEfficiencyMode: false);
     }
 
-    private void ShowHotkeyFailure()
+    /// <summary>Hide or show the orb. Hiding is also the panic action (D-030): it cancels a running reply and closes the bubble and input.</summary>
+    private void TogglePanic()
     {
-        if (_hotkeyFailureShown) return;
-        _hotkeyFailureShown = true;
-        _tray?.ShowNotification("Companion", "Ctrl+Alt+H is already taken. Use Show / Hide in the tray menu.");
+        bool wasVisible = _window!.IsVisible;
+        _window.ToggleVisible();
+        if (wasVisible) _bus?.Publish(new PanicHide());
     }
+
+    private void ShowHotkeyFailure(string combo, string hint)
+        => _tray?.ShowNotification("Companion", $"{combo} is already taken. {hint}");
 
     private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
     {
@@ -130,6 +144,7 @@ public partial class App : Application
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _hotkeys?.Dispose();
+        _chat?.Dispose();
         _tray?.Dispose();
         _singleInstance?.Dispose();
         base.OnExit(e);

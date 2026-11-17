@@ -21,6 +21,9 @@ public partial class CharacterWindow : Window
         IsVisibleChanged += (_, _) => UpdateAnimation();
     }
 
+    /// <summary>A click on the orb that was not a drag (opens the chat input, or interrupts a reply).</summary>
+    internal event Action? OrbClicked;
+
     public bool ClickThrough { get; private set; }
     public bool NoActivate { get; private set; }
 
@@ -60,9 +63,12 @@ public partial class CharacterWindow : Window
     private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed) return;
-        try { DragMove(); } catch (InvalidOperationException) { return; }
+        NativeMethods.GetWindowRect(_hwnd, out var before);
+        try { DragMove(); } catch (InvalidOperationException) { return; } // returns when the button is released
         if (NativeMethods.GetWindowRect(_hwnd, out var r))
         {
+            // Moved less than a few pixels = a click, not a drag.
+            if (Math.Abs(r.Left - before.Left) <= 3 && Math.Abs(r.Top - before.Top) <= 3) { OrbClicked?.Invoke(); return; }
             _settings.WindowX = r.Left;
             _settings.WindowY = r.Top;
             _settings.Save();
@@ -93,6 +99,8 @@ public partial class CharacterWindow : Window
         _paused = paused;
         UpdateAnimation();
     }
+
+    internal void SetActivity(Activity activity) => Orb.Animator.SetActivity(activity);
 
     private void UpdateAnimation()
     {

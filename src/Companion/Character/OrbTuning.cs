@@ -21,4 +21,8 @@ internal static class OrbTuning
     /// <summary>Glow brightness (opacity) at rest and at the top of the breath, moving in sync with the scale.</summary>
     public const double GlowOpacityMin = 0.55;
     public const double GlowOpacityMax = 0.90;
+
+    /// <summary>Thinking (step 2, D-058): frame rate and speed of the same breathing, in a purple tint. Only while a reply is slow.</summary>
+    public const int ThinkingFps = 30;
+    public const double ThinkingSpeedRatio = 2.0;
 }
