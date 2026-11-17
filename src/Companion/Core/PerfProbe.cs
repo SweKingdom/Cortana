@@ -63,7 +63,7 @@ internal static class PerfProbe
             bool real = i < warm;
             first = null; filler = false; failed = null; mood = null; notes = 0; fullNotes = 0; talkStart = 0; done = new TaskCompletionSource();
             var msg = Script[i % Script.Length];
-            if (real) { chat.OpenInput(); await Task.Delay(typingMs); }   // pre-warm starts when the input opens
+            if (real) { chat.ProbeType(msg); await Task.Delay(typingMs); }   // pre-warm starts on the first keystroke; the box stays open between messages (D-071)
             enter = Stopwatch.GetTimestamp();
             chat.ProbeSubmit(msg);
             await Task.WhenAny(done.Task, Task.Delay(120_000));

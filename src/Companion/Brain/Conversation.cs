@@ -28,7 +28,7 @@ internal sealed class Conversation
     private readonly int _summaryDelayMs;
 
     private int _turnId, _ticket;
-    private bool _inputOpen;      // a pre-warmed process may exist: the input is open
+    private bool _hasDraft;       // the chat input holds unsent text (open, or hidden with the draft kept): no summary (D-066, refined)
     private CancellationTokenSource? _summaryCts;
     private CancellationTokenSource? _cts;
     private Task _running = Task.CompletedTask;
@@ -82,14 +82,28 @@ internal sealed class Conversation
         _savedInterrupted = true;
     }
 
-    /// <summary>The input opened or push-to-talk began: start the process now (D-055). Skipped while a reply runs.</summary>
+    /// <summary>
+    /// The input opened, Philip typed the first key after a send, or push-to-talk began: start the process now (D-055,
+    /// D-071). Skipped while a reply runs; does nothing if a warm process already exists.
+    /// </summary>
     public void PreWarm()
     {
         CancelSummary();   // the summary never runs next to a typing Philip
-        _inputOpen = true;
         if (_cts == null) _brain.PreWarm(_prompts.BuildSystem());
     }
-    public void CancelPreWarm() { _inputOpen = false; _brain.CancelPreWarm(); }
+    public void CancelPreWarm() => _brain.CancelPreWarm();
+
+    /// <summary>
+    /// Whether the chat input holds text (D-066 refined by D-071). The first keystroke cancels a waiting summary; when the
+    /// box is empty again the summary is scheduled anew (15 s of quiet) if the history is past the cap.
+    /// </summary>
+    public void SetDraft(bool hasText)
+    {
+        if (_hasDraft == hasText) return;
+        _hasDraft = hasText;
+        if (hasText) CancelSummary();
+        else if (!IsBusy) ScheduleSummary();
+    }
 
     /// <summary>Stop the running reply: the process is killed (D-055) and the partial reply is saved as [interrupted].</summary>
     public void Interrupt()
@@ -107,7 +121,7 @@ internal sealed class Conversation
     private async Task SendCoreAsync(string text)
     {
         int ticket = ++_ticket;
-        _inputOpen = false;
+        _hasDraft = false;
         var previous = _running;
         Interrupt();
         if (!previous.IsCompleted) await previous; // lets the interrupted turn write its history entry first
@@ -263,7 +277,7 @@ internal sealed class Conversation
         try
         {
             await Task.Delay(_summaryDelayMs, cts.Token);
-            if (cts.IsCancellationRequested || IsBusy || _inputOpen) return null;   // only when idle
+            if (cts.IsCancellationRequested || IsBusy || _hasDraft) return null;   // only when idle and the input box is empty
             return await _summarizer!.RunAsync(cts.Token);
         }
         catch (OperationCanceledException) { return null; }

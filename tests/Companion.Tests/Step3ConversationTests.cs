@@ -315,4 +315,47 @@ public class Step3ConversationTests
         Assert.Equal("", r.Memory.ReadSummary());
         Assert.True(new Summarizer(r.Brain, r.History, r.Memory, r.Quota).Due);   // still due: tried again later
     }
+
+    [Fact]
+    public async Task TheFirstKeystrokeCancelsTheSummaryAndAnEmptyBoxBringsItBack()
+    {
+        var r = new Rig(summaryDelayMs: 200);
+        r.Say("ok [idle]");
+        for (int i = 0; i < 16; i++) await r.Conv.SendAsync("m" + i);
+        var first = r.Conv.SummaryTask!;
+        r.Conv.SetDraft(true);                 // Philip starts typing
+        Assert.Null(await first);
+        Assert.Equal(32, r.History.Count);
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("They chatted.")), (0, FakeBrain.Done()));
+        r.Conv.SetDraft(false);                // the box is empty again (deleted, or Esc): 15 s of quiet starts over
+        var second = r.Conv.SummaryTask!;
+        Assert.NotSame(first, second);
+        var result = await second;
+        Assert.NotNull(result);
+        Assert.Equal(20, r.History.Count);
+    }
+
+    [Fact]
+    public async Task ADraftKeptInAHiddenBoxStillBlocksTheSummary()
+    {
+        var r = new Rig(summaryDelayMs: 50);
+        r.Say("ok [idle]");
+        for (int i = 0; i < 15; i++) await r.Conv.SendAsync("m" + i);   // 30 messages, not yet due
+        r.Conv.SetDraft(true);
+        await r.Conv.SendAsync("one more");   // sending clears the draft state; this reply makes it due
+        r.Conv.SetDraft(true);                // typed again, box then hidden with the draft kept
+        Assert.Null(await r.Conv.SummaryTask!);
+        Assert.Equal(32, r.History.Count);
+    }
+
+    [Fact]
+    public async Task SendingATypedMessageClearsTheDraftSoTheSummaryCanRun()
+    {
+        var r = new Rig(summaryDelayMs: 10);
+        r.Say("ok [idle]");
+        r.Conv.SetDraft(true);
+        for (int i = 0; i < 16; i++) await r.Conv.SendAsync("m" + i);
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("They chatted.")), (0, FakeBrain.Done()));
+        Assert.NotNull(await r.Conv.SummaryTask!);
+    }
 }

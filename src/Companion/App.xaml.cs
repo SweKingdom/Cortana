@@ -72,7 +72,7 @@ public partial class App : Application
         if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x48 /* H */, TogglePanic))
             ShowHotkeyFailure("Ctrl+Alt+H", "Use Show / Hide in the tray menu.");
         // Chat hotkey (hard-coded until step 4 settings, like the panic key).
-        if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_SPACE, () => _chat!.OpenInput()))
+        if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_SPACE, () => _chat!.ToggleInput()))
             ShowHotkeyFailure("Ctrl+Alt+Space", "Click the orb to chat.");
 
         if (PerfProbe.Enabled) _ = PerfProbe.RunAsync(_chat);

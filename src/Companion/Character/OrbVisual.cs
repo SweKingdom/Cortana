@@ -5,7 +5,7 @@ using System.Windows.Shapes;
 
 namespace Companion.Character;
 
-/// <summary>The brushes and glow of a built orb, so the animator can recolour it (thinking, step 2).</summary>
+/// <summary>The brushes and glow of a built orb, so the animator can recolour it.</summary>
 internal sealed record OrbParts(Grid Root, Ellipse Glow, RadialGradientBrush GlowBrush, RadialGradientBrush CoreBrush, Canvas Particles);
 
 /// <summary>Stop colours of the orb gradients for one state. Glow stops: centre, mid, two transparent edge stops. Core: highlight, mid, edge.</summary>
@@ -18,15 +18,6 @@ internal sealed record OrbPalette(Color[] Glow, Color[] Core)
             Color.FromArgb(0x00, 0x10, 0x40, 0xFF), Color.FromArgb(0x00, 0x10, 0x40, 0xFF),
         },
         new[] { Colors.White, Color.FromRgb(0x9F, 0xD4, 0xFF), Color.FromRgb(0x2F, 0x7D, 0xFF) });
-
-    /// <summary>Purple, for "thinking" (step 2: tint only; spinning particles come in step 3, D-051).</summary>
-    public static readonly OrbPalette Thinking = new(
-        new[]
-        {
-            Color.FromArgb(0x90, 0xA0, 0x70, 0xFF), Color.FromArgb(0x50, 0x80, 0x50, 0xE0),
-            Color.FromArgb(0x00, 0x60, 0x30, 0xD0), Color.FromArgb(0x00, 0x60, 0x30, 0xD0),
-        },
-        new[] { Colors.White, Color.FromRgb(0xD6, 0xC2, 0xFF), Color.FromRgb(0x7A, 0x4D, 0xFF) });
 
     /// <summary>Light blue, for "talking" when the reply carries no expression.</summary>
     public static readonly OrbPalette Talking = Make(0x7F, 0xD0, 0xFF, 0x60, 0xB8, 0xFF, 0x30, 0x90, 0xFF, 0xC4, 0xE8, 0xFF, 0x4F, 0xA8, 0xFF);
@@ -97,7 +88,7 @@ internal static class OrbVisual
             Width = Size, Height = Size, IsHitTestVisible = false, Visibility = Visibility.Collapsed,
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform(0),
         };
-        var dot = new SolidColorBrush(Color.FromArgb(0xD0, 0xF0, 0xE8, 0xFF)); dot.Freeze();
+        var dot = new SolidColorBrush(Color.FromArgb(0xF0, 0xB0, 0x78, 0xFF)); dot.Freeze();   // purple: the thinking signal over whatever colour is held (D-070)
         for (int i = 0; i < OrbTuning.ParticleCount; i++)
         {
             double a = 2 * Math.PI * i / OrbTuning.ParticleCount;

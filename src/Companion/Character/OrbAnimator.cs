@@ -32,6 +32,8 @@ internal sealed class OrbAnimator : IAnimator
     private Profile? _playing;
     private OrbPalette? _palette;
     private bool _particlesOn;
+    private bool _fading;                 // the held expression's colour is fading back to idle blue (D-070)
+    private Action? _fadeDone;
 
     internal OrbAnimator(FrameworkElement host, OrbParts parts)
     {
@@ -75,6 +77,7 @@ internal sealed class OrbAnimator : IAnimator
     /// <summary>The reply's mood tag (None clears it). A new expression plays its own motion once the orb is idle.</summary>
     public void SetExpression(Expression expression)
     {
+        StopFade();   // a new reply (even with the same tag) brings the colour back
         if (expression == _expression) return;
         _expression = expression;
         _oneShotDone = false;
@@ -95,6 +98,58 @@ internal sealed class OrbAnimator : IAnimator
         _running = false;
         StopPlaying();
         SetParticles(false);
+        if (_fading) FinishFade();   // hidden: no frames are drawn, so the fade just completes
+    }
+
+    /// <summary>
+    /// After a long quiet (D-070): the colour of the held expression fades to idle blue over <paramref name="seconds"/>,
+    /// at the idle frame rate, then the expression is none and <paramref name="done"/> is called. Any new expression or
+    /// <see cref="StopFade"/> cancels it and brings the colour back.
+    /// </summary>
+    public void FadeExpression(double seconds, Action done)
+    {
+        if (_expression == Expression.None || _fading) return;
+        if (!_running || _activity != Activity.Idle) { _expression = Expression.None; _oneShotDone = false; Apply(); done(); return; }
+        _fading = true;
+        _fadeDone = done;
+        var to = OrbPalette.Idle;
+        int fps = _idle.Fps;
+        for (int i = 0; i < to.Glow.Length; i++) FadeStop(_parts.GlowBrush.GradientStops[i], to.Glow[i], seconds, fps, last: false);
+        for (int i = 0; i < to.Core.Length; i++) FadeStop(_parts.CoreBrush.GradientStops[i], to.Core[i], seconds, fps, last: i == to.Core.Length - 1);
+    }
+
+    private void FadeStop(GradientStop stop, Color to, double seconds, int fps, bool last)
+    {
+        var a = new ColorAnimation(to, TimeSpan.FromSeconds(seconds)) { FillBehavior = FillBehavior.HoldEnd };
+        Timeline.SetDesiredFrameRate(a, fps);
+        if (last) a.Completed += (_, _) => { if (_fading) FinishFade(); };
+        stop.BeginAnimation(GradientStop.ColorProperty, a);
+    }
+
+    private void ClearFadeAnimations()
+    {
+        foreach (var s in _parts.GlowBrush.GradientStops) s.BeginAnimation(GradientStop.ColorProperty, null);
+        foreach (var s in _parts.CoreBrush.GradientStops) s.BeginAnimation(GradientStop.ColorProperty, null);
+    }
+
+    /// <summary>Cancels a fade in progress and shows the held colour again.</summary>
+    public void StopFade()
+    {
+        if (!_fading) return;
+        _fading = false; _fadeDone = null;
+        ClearFadeAnimations();
+        if (_palette != null) OrbVisual.Apply(_parts, _palette);
+    }
+
+    private void FinishFade()
+    {
+        var done = _fadeDone;
+        _fading = false; _fadeDone = null;
+        ClearFadeAnimations();
+        _expression = Expression.None;
+        _oneShotDone = false;
+        Apply();
+        done?.Invoke();
     }
 
     // ---- what to show -----------------------------------------------------------------------------------------
@@ -106,7 +161,7 @@ internal sealed class OrbAnimator : IAnimator
         bool particles = false;
         switch (_activity)
         {
-            case Activity.Thinking: palette = OrbPalette.Thinking; profile = _thinking; particles = true; break;
+            case Activity.Thinking: palette = OrbPalette.For(_expression); profile = _thinking; particles = true; break;   // purple particles over the held colour (D-070)
             case Activity.Talking:
                 palette = _expression == Expression.None ? OrbPalette.Talking : OrbPalette.For(_expression);   // talking + flirty = warm pink, pulsing
                 profile = _talking; break;
@@ -115,7 +170,7 @@ internal sealed class OrbAnimator : IAnimator
                 profile = IdleProfile(_expression, _oneShotDone); break;
         }
 
-        if (!ReferenceEquals(palette, _palette)) { OrbVisual.Apply(_parts, palette); _palette = palette; }
+        if (!ReferenceEquals(palette, _palette)) { if (_fading) { _fading = false; _fadeDone = null; ClearFadeAnimations(); } OrbVisual.Apply(_parts, palette); _palette = palette; }
         SetParticles(particles && _running);
         if (_running && !Equals(profile, _playing)) Play(profile);
     }

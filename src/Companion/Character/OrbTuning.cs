@@ -38,6 +38,10 @@ internal static class OrbTuning
     public const double ParticleSize = 5;
     public const double ParticleSpinSeconds = 3.0;
 
+    // ---- Mood persistence (D-070): the expression colour is held between messages; after this long without chat it fades. ----
+    public const int MoodHoldSeconds = 600;
+    public const double MoodFadeSeconds = 60;
+
     // ---- Expressions (step 3). Colour holds until the bubble goes; the motion is what the table in the architecture says. ----
     // 30 fps is only for thinking and for talking (while text is being revealed). Once the reveal has ended every
     // expression motion below runs at the idle frame rate (IdleFps), so a pinned bubble never holds 30 fps (D-068).
