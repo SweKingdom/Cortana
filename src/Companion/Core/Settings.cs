@@ -3,13 +3,15 @@ using System.Text.Json;
 
 namespace Companion.Core;
 
-/// <summary>Minimal settings.json (step 1: window position only). Lives in %APPDATA%\Companion\.</summary>
+/// <summary>Minimal settings.json (window position, flirt level). Lives in %APPDATA%\Companion\.</summary>
 internal sealed class Settings
 {
     public int Version { get; set; } = 1;
     /// <summary>Window position in physical screen pixels; null = use default corner.</summary>
     public int? WindowX { get; set; }
     public int? WindowY { get; set; }
+    /// <summary>Flirt level 0-4 (D-017): 4 = max, the default. Set from the tray menu; the slider comes in step 4.</summary>
+    public int FlirtLevel { get; set; } = 4;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 

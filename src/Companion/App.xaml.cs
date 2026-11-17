@@ -9,6 +9,8 @@ using Companion.Native;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using Microsoft.Win32;
+using Activity = Companion.Character.Activity;
+using Expression = Companion.Character.Expression;
 
 namespace Companion;
 
@@ -63,7 +65,7 @@ public partial class App : Application
         CreateTray();
         // Chat (step 2): nothing starts here; the session and the windows are created on first use.
         _bus = new EventBus();
-        _chat = new ChatController(_window, _bus, ephemeral: PerfProbe.Enabled);
+        _chat = new ChatController(_window, _bus, _settings, ephemeral: PerfProbe.Enabled);
 
         _hotkeys = new GlobalHotkey();
         // D-030: panic hotkey, suggested Ctrl+Alt+H (hard-coded until step 4 settings).
@@ -74,6 +76,8 @@ public partial class App : Application
             ShowHotkeyFailure("Ctrl+Alt+Space", "Click the orb to chat.");
 
         if (PerfProbe.Enabled) _ = PerfProbe.RunAsync(_chat);
+        if (Enum.TryParse<Expression>(Environment.GetEnvironmentVariable("COMPANION_PERF_PINNED"), out var pinned) && pinned != Expression.None)
+            _chat.ProbePinned(pinned);   // dev hook for perfcheck -Pinned: a pinned bubble with this expression held
 
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -96,8 +100,10 @@ public partial class App : Application
 
         var menu = new ContextMenu();
         menu.Items.Add(showHide);
+        menu.Items.Add(CreateFlirtMenu());
         menu.Items.Add(clickThrough);
         menu.Items.Add(noFocus);
+        if (Environment.GetEnvironmentVariable("COMPANION_DEV") == "1") menu.Items.Add(CreatePreviewMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(quit);
 
@@ -115,6 +121,46 @@ public partial class App : Application
             },
         };
         _tray.ForceCreate(enablesEfficiencyMode: false);
+    }
+
+    /// <summary>Flirt level 0-4 (D-017). Applies from the next message; the settings slider comes in step 4.</summary>
+    private MenuItem CreateFlirtMenu()
+    {
+        var names = new[] { "0  Off", "1  Warm", "2  Teasing", "3  Flirty", "4  Max" };
+        var root = new MenuItem { Header = "Flirt level" };
+        var items = new List<MenuItem>();
+        for (int i = 0; i < names.Length; i++)
+        {
+            int level = i;
+            var item = new MenuItem { Header = names[i], IsCheckable = true, IsChecked = Math.Clamp(_settings.FlirtLevel, 0, 4) == i };
+            item.Click += (_, _) =>
+            {
+                _settings.FlirtLevel = level;
+                _settings.Save();
+                foreach (var other in items) other.IsChecked = ReferenceEquals(other, item);
+            };
+            items.Add(item);
+            root.Items.Add(item);
+        }
+        return root;
+    }
+
+    /// <summary>Dev only (COMPANION_DEV=1): shows each activity and expression without a chat, so Philip can judge the look.</summary>
+    private MenuItem CreatePreviewMenu()
+    {
+        var root = new MenuItem { Header = "Preview (dev)" };
+        void Add(string name, Action action) { var m = new MenuItem { Header = name }; m.Click += (_, _) => action(); root.Items.Add(m); }
+        Add("Thinking (particles)", () => { _window!.SetExpression(Expression.None); _window.SetActivity(Activity.Thinking); });
+        Add("Talking", () => _window!.SetActivity(Activity.Talking));
+        Add("Idle", () => _window!.SetActivity(Activity.Idle));
+        root.Items.Add(new Separator());
+        foreach (var e in new[] { Expression.Happy, Expression.Teasing, Expression.Flirty, Expression.Concerned })
+        {
+            var expression = e;
+            Add(expression.ToString(), () => { _window!.SetActivity(Activity.Idle); _window.SetExpression(Expression.None); _window.SetExpression(expression); });
+        }
+        Add("Clear expression", () => _window!.SetExpression(Expression.None));
+        return root;
     }
 
     /// <summary>Hide or show the orb. Hiding is also the panic action (D-030): it cancels a running reply and closes the bubble and input.</summary>

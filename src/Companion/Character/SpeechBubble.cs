@@ -27,6 +27,7 @@ internal sealed class SpeechBubble
     private Border? _border;
     private ScrollViewer? _scroll;
     private TextBlock? _text;
+    private StackPanel? _notes;      // note rows under the text (memory notes with Undo, the memory-full line)
     private Storyboard? _fade;
     private int _fadeVersion;
     private bool _isFiller;
@@ -43,6 +44,9 @@ internal sealed class SpeechBubble
     /// <summary>Set by the owner: called on a click; returns true when it showed text that was still waiting (the click is used up).</summary>
     public Func<bool>? SkipReveal { get; set; }
 
+    /// <summary>The bubble was removed (faded out, hidden or replaced). The owner clears the orb's expression then.</summary>
+    public event Action? Closed;
+
     public bool IsOpen => _popup is { IsOpen: true };
     public bool IsPinned => _pinned;
     /// <summary>True while the bubble shows a filler line (to be replaced by the real reply).</summary>
@@ -56,6 +60,8 @@ internal sealed class SpeechBubble
         _countdown = false;
         _isFiller = filler;
         _text!.Text = text;
+        _text.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        _notes!.Children.Clear();
         _text.FontStyle = filler ? FontStyles.Italic : FontStyles.Normal;
         _text.Opacity = filler ? 0.75 : 1.0;
         _scroll!.ScrollToTop();
@@ -68,7 +74,8 @@ internal sealed class SpeechBubble
         if (!IsOpen) { SetText(delta, filler: false); return; }
         StopFade();
         _countdown = false;
-        _text!.Text += delta;
+        _text!.Visibility = Visibility.Visible;
+        _text.Text += delta;
         _scroll!.ScrollToEnd();
     }
 
@@ -84,13 +91,57 @@ internal sealed class SpeechBubble
         if (!(_hover || _pinned)) BeginFade(_remainingMs);
     }
 
+    /// <summary>
+    /// Adds a small line under the reply, e.g. "Remembered: ..." with an Undo link. <paramref name="undo"/> runs when the
+    /// link is clicked and returns the line's new text. With no bubble open it makes a bubble that holds only the note.
+    /// </summary>
+    public void AddNote(string text, Func<string>? undo = null)
+    {
+        if (!IsOpen) SetText("", filler: false);
+        StopFade();
+        var label = new TextBlock
+        {
+            Text = text, FontSize = 11, FontStyle = FontStyles.Italic, TextWrapping = TextWrapping.Wrap, MaxWidth = MaxTextWidth - (undo != null ? 48 : 0),
+            Foreground = new SolidColorBrush(Color.FromRgb(0xA8, 0xC4, 0xE8)), VerticalAlignment = VerticalAlignment.Center,
+        };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+        row.Children.Add(label);
+        if (undo != null)
+        {
+            var link = new TextBlock
+            {
+                Text = "Undo", FontSize = 11, Margin = new Thickness(8, 0, 0, 0), Cursor = Cursors.Hand, VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x7F, 0xC8, 0xFF)), TextDecorations = TextDecorations.Underline,
+            };
+            link.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;   // not a click on the bubble: no pin, no skip
+                label.Text = undo();
+                row.Children.Remove(link);
+            };
+            row.Children.Add(link);
+        }
+        _notes!.Children.Add(row);
+    }
+
+    /// <summary>Pins the bubble as a click would (perfcheck's pinned-expression probe).</summary>
+    internal void Pin()
+    {
+        if (_border == null) return;
+        _pinned = true;
+        _border.BorderBrush = PinnedBorder;
+        UpdatePause();
+    }
+
     /// <summary>Removes the bubble at once and releases its window. Also what unpins it.</summary>
     public void Hide()
     {
         StopFade();
+        bool wasOpen = _popup != null;
         if (_popup != null) { _popup.IsOpen = false; _popup.Child = null; }
-        _popup = null; _border = null; _scroll = null; _text = null;
+        _popup = null; _border = null; _scroll = null; _text = null; _notes = null;
         _isFiller = false; _hover = false; _pinned = false; _countdown = false;
+        if (wasOpen) Closed?.Invoke();
     }
 
     private void BeginFade(double delayMs)
@@ -142,12 +193,16 @@ internal sealed class SpeechBubble
             Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xF2, 0xFF)),
         };
         _scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = 220, Content = _text };
+        _notes = new StackPanel();
+        var body = new StackPanel();
+        body.Children.Add(_scroll);
+        body.Children.Add(_notes);
         _border = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x10, 0x18, 0x30)),
             BorderBrush = NormalBorder,
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(11, 8, 11, 8),
-            Child = _scroll, Cursor = Cursors.Hand,
+            Child = body, Cursor = Cursors.Hand,
         };
         _border.MouseEnter += (_, _) => { _hover = true; UpdatePause(); };
         _border.MouseLeave += (_, _) => { _hover = false; UpdatePause(); };

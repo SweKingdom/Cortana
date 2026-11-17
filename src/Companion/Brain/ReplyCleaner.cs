@@ -1,23 +1,28 @@
 using System.Text;
+using Companion.Core;
 
 namespace Companion.Brain;
 
 /// <summary>
 /// Cleans a streamed reply before it reaches the bubble: removes tool tags (D-057), which are never shown, and the
-/// mood tag at the very end (kept in <see cref="Mood"/> for step 3). Streaming: text that might still turn into a
+/// mood tag at the very end (kept in <see cref="Mood"/>). The text of each tool tag is collected in <see cref="ToolTags"/> for the strict parser (D-057). Streaming: text that might still turn into a
 /// tag is held back until it is clear, and trailing whitespace is held until more text follows.
 /// </summary>
 internal sealed class ReplyCleaner
 {
-    private static readonly string[] Moods = { "idle", "happy", "teasing", "flirty", "concerned" };
+    private static readonly string[] Moods = MoodTag.Names;
     private const string ToolOpen = "<tool";
     private const string ToolClose = "</tool>";
 
     private readonly StringBuilder _undecided = new();
+    private readonly StringBuilder _tagBuf = new();
     private string _heldWhitespace = "";
     private bool _inTag, _started;
+    private bool _skipSpaceAfterTag;   // text stood before a dropped tag: the whitespace after it is dropped, so no double space
 
     public string? Mood { get; private set; }
+    /// <summary>For each well-formed tool tag in the reply, what stood between "&lt;tool" and "&lt;/tool&gt;" (e.g. <c> name="remember"&gt;{...}</c>).</summary>
+    public List<string> ToolTags { get; } = new();
     /// <summary>True if the reply ended inside a tool tag; the rest was dropped, never shown.</summary>
     public bool UnclosedTag { get; private set; }
 
@@ -35,8 +40,16 @@ internal sealed class ReplyCleaner
             if (_inTag)
             {
                 int end = s.IndexOf(ToolClose, i, StringComparison.OrdinalIgnoreCase);
-                if (end >= 0) { _inTag = false; i = end + ToolClose.Length; continue; }
-                if (!final) _undecided.Append(PartialSuffix(s, i, ToolClose)); // "</to" may complete next time
+                if (end >= 0)
+                {
+                    _tagBuf.Append(s, i, end - i);
+                    ToolTags.Add(_tagBuf.ToString()); _tagBuf.Clear();
+                    _skipSpaceAfterTag = _heldWhitespace.Length > 0;
+                    _inTag = false; i = end + ToolClose.Length; continue;
+                }
+                var partial = final ? "" : PartialSuffix(s, i, ToolClose); // "</to" may complete next time
+                _tagBuf.Append(s, i, s.Length - i - partial.Length);
+                _undecided.Append(partial);
                 i = s.Length;
                 break;
             }
@@ -53,7 +66,7 @@ internal sealed class ReplyCleaner
                     }
                     else if (char.IsWhiteSpace(rest[ToolOpen.Length]) || rest[ToolOpen.Length] == '>')
                     {
-                        _inTag = true; i += ToolOpen.Length; continue;
+                        _inTag = true; _tagBuf.Clear(); i += ToolOpen.Length; continue;
                     }
                 }
                 else if (!final && rest.Length < ToolOpen.Length && ToolOpen.AsSpan(0, rest.Length).Equals(rest, StringComparison.OrdinalIgnoreCase))
@@ -104,9 +117,10 @@ internal sealed class ReplyCleaner
     {
         if (char.IsWhiteSpace(c))
         {
-            if (_started) _heldWhitespace += c;   // leading whitespace of the reply is dropped
+            if (_started && !_skipSpaceAfterTag) _heldWhitespace += c;   // leading whitespace of the reply is dropped
             return;
         }
+        _skipSpaceAfterTag = false;
         _started = true;
         if (_heldWhitespace.Length > 0) { o.Append(_heldWhitespace); _heldWhitespace = ""; }
         o.Append(c);

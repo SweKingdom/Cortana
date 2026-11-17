@@ -84,7 +84,7 @@ public class FillersTests
     }
 
     [Fact]
-    public void TemporaryListHasAtLeastTwoLines() => Assert.True(Fillers.Temporary.Length >= 2);
+    public void WithNoListItUsesTheDefaultPersonalitysFillers() { var f = new Fillers(); Assert.Contains(f.Next(), Personality.Default.Fillers!); }
 }
 
 public class EventBusTests
