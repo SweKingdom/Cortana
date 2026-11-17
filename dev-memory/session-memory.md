@@ -81,3 +81,15 @@ Rules:
 - Design changed: docs/architecture.md updated (ClaudeCodeBrain process mode, pre-warm, flags and minimum version, interrupt, RAM at rest, P1 marked done, D-055/D-056). Philip updates the claude.ai doc to match.
 - Last confirmed action: Philip accepted D-055 and D-056, asked for the pre-warm measurement, the doc updates, a commit, and (per the new rule) a pushed branch with a pull request.
 - Next: P2 (tool-call reliability), P4 game test (Philip), then step 2.
+
+## 2026-11-17 — prototype P2, text tool protocol (Claude, approved by Philip)
+
+- Branch: p2-tool-call-reliability, pushed to origin with a pull request; Philip merges on GitHub. Repo at start matched the last entry (main, 3b7175d = merge of PR #1, clean).
+- Added: prototypes/P2/ (console harness, README, results.md, raw CSV/JSONL for variants A and B, self-test log). No new dependencies.
+- Variant A (50 requests, 92 processes, Haiku, Claude Code 2.1.318): 0 malformed, 0 leaked over 51 tags; judgment failures 2 (list-then-act chains cut off by the one-round harness: #17, #41); first visible word 5071 ms median / 7484 p90, final reply 6119 / 8539 (a second process for every tool call). A self-test of 11 handcrafted bad outputs confirmed the detectors flag them.
+- Variant B, requested by Philip (42 tool requests, one run): 0 malformed, 0 leaked, 0 missed, 0 wrong arguments, 2 spurious (`list_reminders` before a cancel). Second process in 9 of 42 (21%), all starting with `list_reminders`. First visible word 2163 / 4274, final reply 2445 / 4617. Pre-warming on any tag wasted 37 of 46 spawned processes.
+- Decision: D-057 accepted by Philip (text protocol, strict parsing, up to 3 rounds, `ReplyCleaner`) with the variant B loop design that won. One refinement is mine and goes beyond what was measured: pre-warm only on a read-back tag instead of every tag; Philip can veto it when reviewing the PR.
+- Uncertain: the tool-failure path was never exercised (no call failed), so confirmation-before-failure is untested; one model (Haiku), one run per variant, single-message requests without history; run-to-run noise is several hundred ms; Sonnet not tested; the narrower pre-warm policy is derived, not measured. Haiku started 40 of 50 first passes with a thinking block (+0.7 s first word): the D-055 thinking question is still open and now matters for step 2. P4 game test still open.
+- Design changed: docs/architecture.md updated (tool protocol decided and the loop design, thinking note, P2 marked done, step 5 loop, D-001 to D-057). Philip updates the claude.ai doc to match.
+- Last confirmed action: Philip approved D-057 and asked for variant B, the decision with the winning loop design, the dev-memory and architecture updates, a commit, a pushed branch and a pull request.
+- Next: step 2 (chat with Claude), P4 game test (Philip).

@@ -1,0 +1,12 @@
+PASS  single quotes -> shape malformed + leak  (calls=0 shapeMal=1 other=0 malformed=1 leak=True)
+PASS  bad JSON  (calls=1 shapeMal=0 other=0 malformed=1 leak=False)
+PASS  path target  (calls=1 shapeMal=0 other=0 malformed=1 leak=False)
+PASS  unknown tool  (calls=1 shapeMal=0 other=0 malformed=1 leak=False)
+PASS  URL without scheme  (calls=1 shapeMal=0 other=0 malformed=1 leak=False)
+PASS  bad when  (calls=1 shapeMal=0 other=0 malformed=1 leak=False)
+PASS  unclosed tag -> shape malformed + leak  (calls=0 shapeMal=1 other=0 malformed=1 leak=True)
+PASS  other format + leak  (calls=0 shapeMal=0 other=1 malformed=1 leak=True)
+PASS  raw args JSON leak  (calls=0 shapeMal=0 other=0 malformed=0 leak=True)
+PASS  valid call, cleaned, no leak  (calls=1 shapeMal=0 other=0 malformed=0 leak=False)
+PASS  two valid calls  (calls=2 shapeMal=0 other=0 malformed=0 leak=False)
+selftest: all 11 passed

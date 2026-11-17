@@ -1,0 +1,87 @@
+claude 2.1.318 (Claude Code)  model=haiku
+ 1 [one] p1 fw=4255 tot=4492 | p2 fw=4815 tot=5088 calls=[set_reminder] ok
+ 2 [one] p1 fw=3881 tot=3965 | p2 fw=6282 tot=6628 calls=[set_reminder] ok
+ 3 [one] p1 fw=3084 tot=3095 | p2 fw=8112 tot=8440 calls=[set_reminder] ok
+ 4 [one] p1 fw=2670 tot=2900 | p2 fw=3198 tot=3491 calls=[set_reminder] ok
+ 5 [one] p1 fw=3827 tot=3983 | p2 fw=2069 tot=2322 calls=[set_reminder] ok
+ 6 [one] p1 fw=3002 tot=3135 | p2 fw=3389 tot=3737 calls=[set_reminder] ok
+ 7 [one] p1 fw=5249 tot=5395 | p2 fw=2758 tot=3145 calls=[set_reminder] ok
+ 8 [one] p1 fw=3543 tot=3673 | p2 fw=3705 tot=4125 calls=[set_reminder] ok
+ 9 [one] p1 fw=3490 tot=3506 | p2 fw=6120 tot=6445 calls=[set_reminder] ok
+10 [one] p1 fw=2147 tot=2344 | p2 fw=3394 tot=3904 calls=[list_reminders] ok
+11 [one] p1 fw=2591 tot=2921 | p2 fw=2978 tot=3565 calls=[list_reminders] ok
+12 [one] p1 fw=1983 tot=2056 | p2 fw=2597 tot=2842 calls=[list_reminders] ok
+13 [one] p1 fw=2745 tot=2775 | p2 fw=3920 tot=4422 calls=[list_reminders] ok
+14 [one] p1 fw=1700 tot=1937 | p2 fw=3849 tot=4252 calls=[list_reminders] ok
+15 [one] p1 fw=3019 tot=3031 | p2 fw=2978 tot=3356 calls=[cancel_reminder] ok
+16 [one] p1 fw=3464 tot=3531 | p2 fw=1804 tot=2082 calls=[cancel_reminder] ok
+17 [one] p1 fw=2678 tot=2755 | p2 fw=4051 tot=4158 calls=[list_reminders] FAIL spurious list_reminders; missed 1; 
+18 [one] p1 fw=2817 tot=2917 | p2 fw=2150 tot=2464 calls=[cancel_reminder] ok
+19 [one] p1 fw=1518 tot=1718 | p2 fw=2014 tot=2351 calls=[open] ok
+20 [one] p1 fw=1945 tot=2152 | p2 fw=4217 tot=4544 calls=[open] ok
+21 [one] p1 fw=2446 tot=2534 | p2 fw=2200 tot=2412 calls=[open] ok
+22 [one] p1 fw=5378 tot=5539 | p2 fw=1762 tot=1962 calls=[open] ok
+23 [one] p1 fw=2341 tot=2431 | p2 fw=1426 tot=1753 calls=[open] ok
+24 [one] p1 fw=1983 tot=2173 | p2 fw=2495 tot=2888 calls=[open] ok
+25 [one] p1 fw=2548 tot=2624 | p2 fw=2313 tot=2571 calls=[open] ok
+26 [one] p1 fw=2301 tot=2378 | p2 fw=1957 tot=2014 calls=[open] ok
+27 [one] p1 fw=2415 tot=2648 | p2 fw=2705 tot=2919 calls=[remember] ok
+28 [one] p1 fw=2324 tot=2424 | p2 fw=2779 tot=2949 calls=[remember] ok
+29 [one] p1 fw=2235 tot=2358 | p2 fw=2094 tot=2491 calls=[remember] ok
+30 [one] p1 fw=2861 tot=3160 | p2 fw=2451 tot=2831 calls=[remember] ok
+31 [one] p1 fw=2154 tot=2299 | p2 fw=3783 tot=4167 calls=[remember] ok
+32 [one] p1 fw=3494 tot=3771 | p2 fw=2442 tot=2696 calls=[remember] ok
+33 [one] p1 fw=2041 tot=2133 | p2 fw=2311 tot=2540 calls=[remember] ok
+34 [one] p1 fw=2638 tot=2867 | p2 fw=2082 tot=2362 calls=[remember] ok
+35 [two] p1 fw=2509 tot=2706 | p2 fw=1577 tot=1957 calls=[set_reminder,open] ok
+36 [two] p1 fw=5120 tot=5361 | p2 fw=2123 tot=2499 calls=[remember,set_reminder] ok
+37 [two] p1 fw=3931 tot=4209 | p2 fw=2360 tot=2637 calls=[open,set_reminder] ok
+38 [two] p1 fw=2593 tot=2813 | p2 fw=2976 tot=3306 calls=[cancel_reminder,set_reminder] ok
+39 [two] p1 fw=2382 tot=2490 | p2 fw=2581 tot=2950 calls=[list_reminders,open] ok
+40 [two] p1 fw=2229 tot=2536 | p2 fw=2016 tot=2477 calls=[remember,open] ok
+41 [two] p1 fw=1545 tot=1755 | p2 fw=2569 tot=2701 calls=[list_reminders] FAIL missed 1; 
+42 [two] p1 fw=2270 tot=2481 | p2 fw=2022 tot=2294 calls=[set_reminder,set_reminder] ok
+43 [none] p1 fw=1914 tot=2360 calls=[] ok
+44 [none] p1 fw=1705 tot=1952 calls=[] ok
+45 [none] p1 fw=1970 tot=2384 calls=[] ok
+46 [none] p1 fw=2873 tot=3283 calls=[] ok
+47 [none] p1 fw=2078 tot=2414 calls=[] ok
+48 [none] p1 fw=2360 tot=2617 calls=[] ok
+49 [none] p1 fw=7375 tot=8110 calls=[] ok
+50 [none] p1 fw=2285 tot=2686 calls=[] ok
+requests.csv and replies.jsonl written to c:\Users\phili\VSCode\Cortana\prototypes\P2\bin\Release\net10.0\
+
+## Summary (50 requests, haiku)
+infra failures (timeout/no result, after 1 retry): 0
+
+| Group | Requests | Malformed | Leaked | Missed | Wrong args | Spurious |
+| --- | --- | --- | --- | --- | --- | --- |
+| one tool | 34 | 0 | 0 | 1 | 0 | 1 |
+| two tools | 8 | 0 | 0 | 1 | 0 | 0 |
+| no tool | 8 | 0 | 0 | 0 | 0 | 0 |
+| all | 50 | 0 | 0 | 2 | 0 | 1 |
+
+protocol-failed requests (malformed or leaked): 0/50
+judgment-failed requests (missed, wrong args or spurious): 2/50
+any failure: 2/50
+expected tool calls: 50; valid calls made in pass 1: 49; repeat calls in pass 2: 2
+thinking blocks first: pass1 40, pass2 29
+preamble text before first tag: 7 of 42 tool replies
+mood tag at the end of the displayed reply: 48/50 (final pass)
+
+## Timing, ms (median / p90)
+tool turns (n=42):
+  pass 1 first word (from spawn):          2591 / 3931 (n=42)
+  pass 1 total (tool call complete):       2755 / 4209 (n=42)
+  pass 2 first word (from its own spawn):  2569 / 4217 (n=42)
+  pass 2 total:                            2842 / 4544 (n=42)
+  first word of final reply (from Enter):  5738 / 8153 (n=42)
+  final reply complete (from Enter):       6119 / 8539 (n=42)
+no-tool turns (n=8):
+  first word / total:                      2078 / 7375 (n=8)  /  2414 / 8110 (n=8)
+
+## Failures
+17 [one] "cancel the timer" -> spurious list_reminders; missed 1; 
+41 [two] "list my reminders and cancel the stand-up one" -> missed 1; 
+
+claude processes run: 92; reported cost $0,034

@@ -1,0 +1,86 @@
+claude 2.1.318 (Claude Code)  model=haiku  VARIANT B
+ 1 [one] passes=1 visible=2163 final=2481 calls=[set_reminder] ok
+ 2 [one] passes=1 visible=1981 final=2266 calls=[set_reminder] ok
+ 3 [one] passes=1 visible=1842 final=2251 calls=[set_reminder] ok
+ 4 [one] passes=1 visible=2375 final=2682 calls=[set_reminder] ok
+ 5 [one] passes=1 visible=2272 final=2696 calls=[set_reminder] ok
+ 6 [one] passes=1 visible=2423 final=2776 calls=[set_reminder] ok
+ 7 [one] passes=1 visible=2055 final=2467 calls=[set_reminder] ok
+ 8 [one] passes=1 visible=1763 final=2127 calls=[set_reminder] ok
+ 9 [one] passes=1 visible=2173 final=2455 calls=[set_reminder] ok
+10 [one] passes=2 visible=3713 final=4068 calls=[list_reminders] ok
+11 [one] passes=2 visible=3316 final=3658 calls=[list_reminders] ok
+12 [one] passes=2 visible=4274 final=4548 calls=[list_reminders] ok
+13 [one] passes=2 visible=3844 final=4333 calls=[list_reminders] ok
+14 [one] passes=2 visible=4179 final=4709 calls=[list_reminders] ok
+15 [one] passes=1 visible=2010 final=2232 calls=[cancel_reminder] ok
+16 [one] passes=1 visible=2008 final=2473 calls=[cancel_reminder] ok
+17 [one] passes=2 visible=4281 final=4617 calls=[list_reminders,cancel_reminder] FAIL spurious list_reminders; 
+18 [one] passes=2 visible=4506 final=4819 calls=[list_reminders,cancel_reminder] FAIL spurious list_reminders; 
+19 [one] passes=1 visible=1471 final=1898 calls=[open] ok
+20 [one] passes=1 visible=1415 final=1824 calls=[open] ok
+21 [one] passes=1 visible=2230 final=2377 calls=[open] ok
+22 [one] passes=1 visible=2116 final=2378 calls=[open] ok
+23 [one] passes=1 visible=2227 final=2435 calls=[open] ok
+24 [one] passes=1 visible=1502 final=1787 calls=[open] ok
+25 [one] passes=1 visible=1337 final=1711 calls=[open] ok
+26 [one] passes=1 visible=1925 final=1951 calls=[open] ok
+27 [one] passes=1 visible=1379 final=1803 calls=[remember] ok
+28 [one] passes=1 visible=1561 final=1981 calls=[remember] ok
+29 [one] passes=1 visible=1811 final=2195 calls=[remember] ok
+30 [one] passes=1 visible=2177 final=2445 calls=[remember] ok
+31 [one] passes=1 visible=1887 final=2190 calls=[remember] ok
+32 [one] passes=1 visible=1994 final=2293 calls=[remember] ok
+33 [one] passes=1 visible=1539 final=1830 calls=[remember] ok
+34 [one] passes=1 visible=1341 final=1885 calls=[remember] ok
+35 [two] passes=1 visible=2525 final=2808 calls=[set_reminder,open] ok
+36 [two] passes=1 visible=1860 final=2410 calls=[remember,set_reminder] ok
+37 [two] passes=1 visible=2261 final=2730 calls=[open,set_reminder] ok
+38 [two] passes=1 visible=2511 final=2872 calls=[cancel_reminder,set_reminder] ok
+39 [two] passes=2 visible=6431 final=6768 calls=[list_reminders,open] ok
+40 [two] passes=1 visible=2353 final=2736 calls=[remember,open] ok
+41 [two] passes=2 visible=5774 final=6071 calls=[list_reminders,cancel_reminder] ok
+42 [two] passes=1 visible=2219 final=2791 calls=[set_reminder,set_reminder] ok
+requests-B.csv and replies-B.jsonl written to c:\Users\phili\VSCode\Cortana\prototypes\P2\bin\Release\net10.0\
+
+## Variant B summary (42 requests, haiku)
+infra failures: 0
+
+| Group | Requests | Malformed | Leaked | Missed | Wrong args | Spurious |
+| --- | --- | --- | --- | --- | --- | --- |
+| one tool | 34 | 0 | 0 | 0 | 0 | 2 |
+| two tools | 8 | 0 | 0 | 0 | 0 | 0 |
+| all | 42 | 0 | 0 | 0 | 0 | 2 |
+
+protocol-failed requests: 0/42; judgment-failed: 2/42; capped at 3 rounds: 0
+second pass needed: 9/42 (21%); passes distribution: 1=33 2=9 3=0
+  of those, expected list_reminders (read-back): 7; other (tool failure or malformed): 2
+  list_reminders requests that finished in one pass: 0
+pre-warmed process wasted (spawned at a tag, never used): 37; confirmed before a tool failed: 0
+thinking first block, round 1: 31/42
+round 1 had visible text before the tag: 33/42
+
+## Timing from Enter, ms (median / p90), no pre-warm of round 1
+all requests (n=42):
+  first visible word:   2163 / 4274 (n=42)
+  final reply complete: 2445 / 4617 (n=42)
+single-pass requests (n=33):
+  first visible word:   2008 / 2375 (n=33)
+  final reply complete: 2377 / 2776 (n=33)
+requests needing a second pass (n=9):
+  first visible word:   4274 / 6431 (n=9)
+  final reply complete: 4617 / 6768 (n=9)
+second pass, first word from its write (pre-warmed): 2356 / 3898 (n=9); total: 2692 / 4195 (n=9)
+
+## Failures and multi-pass requests
+10 [one] "what reminders do I have?" passes=2 -> ok
+11 [one] "list my reminders" passes=2 -> ok
+12 [one] "do I have anything coming up today?" passes=2 -> ok
+13 [one] "show me everything you're going to remind me about" passes=2 -> ok
+14 [one] "what's on my reminder list?" passes=2 -> ok
+17 [one] "cancel the timer" passes=2 -> spurious list_reminders; 
+18 [one] "ta bort p†minnelsen om hyran" passes=2 -> spurious list_reminders; 
+39 [two] "what reminders do I have? also open Discord" passes=2 -> ok
+41 [two] "list my reminders and cancel the stand-up one" passes=2 -> ok
+
+claude processes that carried a message: 51; reported cost $0,021
