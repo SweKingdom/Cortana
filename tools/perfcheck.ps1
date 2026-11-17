@@ -5,7 +5,13 @@
   Per run: start the app, wait for the first rendered frame (start-to-orb), warm up,
   then measure idle CPU over a window and read private bytes. Reports the median of
   -Runs runs and PASS/FAIL against D-052. Exit code 1 if any metric fails.
-  Not measured yet: first word (step 2), first audio (step 6).
+  -Chat adds a chat run (step 2): the app drives its real chat path with scripted messages
+  (COMPANION_PERF_CHAT, see README) and this script reports first word (Enter to the first real
+  character in the bubble, fillers excluded) for the real flow (input opens, pre-warm, simulated
+  typing) and for cold turns, the app's private bytes after a chat, the whole tree at rest and the
+  peak while a claude process runs (reported separately, D-056). It sends about 15 short Haiku
+  messages on the plan. -ChatOnly skips the idle runs.
+  Not measured yet: first audio (step 6).
   Only the app process (and its children) is measured; GPU / dwm.exe cost is not counted.
 #>
 param(
@@ -14,8 +20,14 @@ param(
     [int]$Runs = 3,
     [int]$WarmupSeconds = 30,
     [int]$MeasureSeconds = 60,
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [switch]$Chat,
+    [switch]$ChatOnly,
+    [int]$ChatWarm = 10,
+    [int]$ChatCold = 5,
+    [int]$TypingMs = 3000
 )
+if ($ChatOnly) { $Chat = $true; $Runs = 0 }
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -25,6 +37,7 @@ $outDir = Join-Path $repo 'perf-results'
 
 # D-052 thresholds (idle CPU <2 %, median of 3)
 $maxPrivateMB = 150; $maxTreeMB = 300; $maxCpuPct = 2.0; $maxStartMs = 1000
+$maxFirstWordMs = 2000   # architecture: first word ~2 s (D-052), judged on the real flow with pre-warm
 
 function Get-Median([double[]]$v) {
     $s = $v | Sort-Object
@@ -96,17 +109,18 @@ for ($run = 1; $run -le $Runs; $run++) {
 }
 Remove-Item Env:COMPANION_PERF_FILE, Env:COMPANION_FPS, Env:COMPANION_RENDER -ErrorAction SilentlyContinue
 
+function Row($name, $value, $fmt, $limit, $unit) {
+    $ok = $value -lt $limit
+    Write-Host ("{0,-28} {1,10} {2}   limit < {3} {2}   {4}" -f $name, ($fmt -f $value), $unit, $limit, $(if ($ok) { 'PASS' } else { 'FAIL' }))
+    return $ok
+}
+
+if ($Runs -gt 0) {
 $med = [pscustomobject]@{
     StartMs   = Get-Median ($results.StartMs)
     CpuPct    = Get-Median ($results.CpuPct)
     PrivateMB = Get-Median ($results.PrivateMB)
     TreeMB    = Get-Median ($results.TreeMB)
-}
-
-function Row($name, $value, $fmt, $limit, $unit) {
-    $ok = $value -lt $limit
-    Write-Host ("{0,-28} {1,10} {2}   limit < {3} {2}   {4}" -f $name, ($fmt -f $value), $unit, $limit, $(if ($ok) { 'PASS' } else { 'FAIL' }))
-    return $ok
 }
 
 Write-Host ""
@@ -117,10 +131,84 @@ $ok = @(
     (Row 'Idle CPU (one core)'        $med.CpuPct    '{0:F3}' $maxCpuPct    '%'),
     (Row 'Start to orb'               $med.StartMs   '{0:F0}' $maxStartMs   'ms')
 )
-Write-Host ("{0,-28} {1}" -f 'First word', 'n/a (step 2)')
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 [pscustomobject]@{ version = 1; fps = $Fps; render = $Render; runs = $results; median = $med } |
     ConvertTo-Json -Depth 4 | Set-Content (Join-Path $outDir "perf-$stamp-${Fps}fps-$Render.json") -Encoding utf8
+} else { $ok = @() }
+
+# ---------------- Chat run (step 2) ----------------
+function Get-Pct([double[]]$v, [double]$p) {
+    if (-not $v -or $v.Count -eq 0) { return [double]::NaN }
+    $s = $v | Sort-Object
+    return $s[[math]::Min($s.Count - 1, [int][math]::Ceiling($p * $s.Count) - 1)]
+}
+
+if ($Chat) {
+    $chatFile = Join-Path $env:TEMP "companion-chat-$PID.jsonl"
+    Remove-Item $chatFile -ErrorAction SilentlyContinue
+    $env:COMPANION_PERF_CHAT = "${ChatWarm}:${ChatCold}"
+    $env:COMPANION_PERF_TYPING_MS = "$TypingMs"
+    $env:COMPANION_PERF_CHAT_FILE = $chatFile
+    $env:COMPANION_FPS = "$Fps"
+    Remove-Item Env:COMPANION_RENDER -ErrorAction SilentlyContinue
+    Get-Process Companion -ErrorAction SilentlyContinue | Stop-Process -Force
+    Write-Host ""
+    Write-Host "Chat run: $ChatWarm real-flow turns (pre-warm, ${TypingMs} ms typing) and $ChatCold cold turns..."
+    $p = Start-Process $exe -PassThru
+    $peakTree = 0.0; $peakProcs = 0; $finished = $false
+    try {
+        $deadline = (Get-Date).AddMinutes(20)
+        while ((Get-Date) -lt $deadline -and -not $p.HasExited) {
+            $p.Refresh()
+            $tree = (Get-TreePrivateBytes $p.Id) / 1MB
+            if ($tree -gt $peakTree) { $peakTree = $tree }
+            $kids = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($p.Id)").Count
+            if ($kids -gt $peakProcs) { $peakProcs = $kids }
+            if ((Test-Path $chatFile) -and (Select-String -Path $chatFile -Pattern '"done":true' -Quiet)) { $finished = $true; break }
+            Start-Sleep -Milliseconds 700
+        }
+        if (-not $finished) { throw "Chat run did not finish (app exited or timeout)" }
+        Start-Sleep -Seconds 10   # let the last claude process exit
+        $p.Refresh()
+        $privMB = $p.PrivateMemorySize64 / 1MB
+        $restTreeMB = (Get-TreePrivateBytes $p.Id) / 1MB
+        $restKids = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($p.Id)").Count
+    }
+    finally {
+        if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+    }
+    Remove-Item Env:COMPANION_PERF_CHAT, Env:COMPANION_PERF_TYPING_MS, Env:COMPANION_PERF_CHAT_FILE, Env:COMPANION_FPS -ErrorAction SilentlyContinue
+
+    $turns = Get-Content $chatFile | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.turn }
+    $warm = @($turns | Where-Object { $_.mode -eq 'warm' }); $cold = @($turns | Where-Object { $_.mode -eq 'cold' })
+    $failed = @($turns | Where-Object { $_.failed }).Count
+    function Get-FirstWords($set) { @($set | Where-Object { $null -ne $_.firstWordMs } | ForEach-Object { [double]$_.firstWordMs }) }
+    function Get-Totals($set) { @($set | Where-Object { $null -ne $_.totalMs } | ForEach-Object { [double]$_.totalMs }) }
+    $warmFw = Get-FirstWords $warm; $coldFw = Get-FirstWords $cold
+    $thinking = @($turns | Where-Object { $_.block -eq 'thinking' }).Count
+    $fillers = @($turns | Where-Object { $_.filler }).Count
+
+    Write-Host ""
+    Write-Host "Chat results ($($turns.Count) turns, $failed failed):"
+    Write-Host ("  first word, real flow (pre-warm, {0} ms typing): median {1:F0} ms, p90 {2:F0} ms, max {3:F0} ms (n={4})" -f $TypingMs, (Get-Pct $warmFw 0.5), (Get-Pct $warmFw 0.9), ($warmFw | Measure-Object -Maximum).Maximum, $warmFw.Count)
+    if ($coldFw.Count) { Write-Host ("  first word, cold (no pre-warm):                   median {0:F0} ms, p90 {1:F0} ms, max {2:F0} ms (n={3})" -f (Get-Pct $coldFw 0.5), (Get-Pct $coldFw 0.9), ($coldFw | Measure-Object -Maximum).Maximum, $coldFw.Count) }
+    Write-Host ("  reply complete, real flow:                        median {0:F0} ms, p90 {1:F0} ms" -f (Get-Pct (Get-Totals $warm) 0.5), (Get-Pct (Get-Totals $warm) 0.9))
+    Write-Host ("  turns that started with a thinking block: {0}/{1}; turns that showed a filler: {2}/{1}" -f $thinking, $turns.Count, $fillers)
+    Write-Host ("  claude processes at once during a reply: up to {0}; tree peak while claude runs: {1:F0} MB (reported separately, D-056)" -f $peakProcs, $peakTree)
+    Write-Host ("  at rest after the chat: {0} claude process(es)" -f $restKids)
+
+    Write-Host ""
+    Write-Host "Chat budget:"
+    $ok += (Row 'First word (real flow)'     (Get-Pct $warmFw 0.5) '{0:F0}' $maxFirstWordMs 'ms')
+    $ok += (Row 'App private bytes after chat' $privMB '{0:F1}' $maxPrivateMB 'MB')
+    $ok += (Row 'Whole tree at rest after chat' $restTreeMB '{0:F1}' $maxTreeMB 'MB')
+    if ($failed -gt 0) { Write-Host "  WARNING: $failed turn(s) failed; first word is over the successful turns only"; $ok += $false }
+
+    $stamp2 = Get-Date -Format 'yyyyMMdd-HHmmss'
+    [pscustomobject]@{ version = 1; typingMs = $TypingMs; turns = $turns; peakTreeMB = $peakTree; privateMB = $privMB; restTreeMB = $restTreeMB } |
+        ConvertTo-Json -Depth 4 | Set-Content (Join-Path $outDir "perf-chat-$stamp2.json") -Encoding utf8
+    Remove-Item $chatFile -ErrorAction SilentlyContinue
+}
 
 if ($ok -contains $false) { exit 1 }

@@ -4,12 +4,13 @@ namespace Companion.Character;
 
 public partial class OrbControl : UserControl
 {
-    public OrbAnimator Animator { get; }
+    internal OrbAnimator Animator { get; }
 
     public OrbControl()
     {
         InitializeComponent();
-        Host.Children.Add(OrbVisual.Build(1.0, out var glow));
-        Animator = new OrbAnimator(Host, glow);
+        var parts = OrbVisual.BuildParts(1.0);
+        Host.Children.Add(parts.Root);
+        Animator = new OrbAnimator(Host, parts);
     }
 }

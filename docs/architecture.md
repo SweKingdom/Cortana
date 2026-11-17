@@ -154,15 +154,19 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
   src/Companion/
     App.xaml(.cs)          start, single-instance, tray, kortkommandon (chatt, panik)
     Core/
-      EventBus.cs          enkel pub/sub mellan modulerna
+      EventBus.cs          enkel pub/sub mellan modulerna; TurnTracker slänger gamla svar (D-038)
+      Events.cs            händelserna på bussen (UserMessage, TurnStarted, Filler, ReplyChunk, ...)
+      AppPaths.cs, Log.cs  mappar under %APPDATA%\Companion\; händelselogg utan meddelandetext
+      ModeSession.cs       ett läges hjärna + samtal, kastas vid lägesbyte (D-041)
+      PerfProbe.cs         dev-krok för perfcheck -Chat; gör inget utan COMPANION_PERF_CHAT
       Mood.cs              humör-enum + parser för [taggar]
       Settings.cs          läser/sparar settings.json
       SecretStore.cs       nycklar och explicit minne via DPAPI
       ModeManager.cs       normalt/explicit läge: profil, hjärna, minnesmapp
       GameMode.cs          upptäcker spel i förgrunden, slår på spelläge
       ActivityWatcher.cs   fönsterbyten (bara programnamn) -> spontana kommentarer
-      Quota.cs             dagliga tak och räknare för abonnemanget
-      GlobalHotkey.cs      RegisterHotKey på ett dolt meddelandefönster (panik nu, chatt i steg 2)
+      Quota.cs             dagliga tak och räknare för abonnemanget (steg 2: bara räknaren, quota.json)
+      GlobalHotkey.cs      RegisterHotKey på ett dolt meddelandefönster (panik, chatt)
     Native/
       NativeMethods.cs     de få P/Invoke-anropen (fönsterstilar, hotkey, skärmkontroll)
     Character/
@@ -170,13 +174,19 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       OrbControl.xaml      greppringen och värdytan för klotet
       OrbVisual.cs         ritar klotet (sken + kärna) i en given skala; enda källan till utseendet
       OrbTuning.cs         andningens värden (fps, cykel, amplitud, glödens ljusstyrka) på ett ställe
-      OrbAnimator.cs       klotet: andning (idle); färg, puls, partiklar per humör kommer i steg 3
+      IAnimator.cs         Activity-enum och SetActivity (SetExpression kommer i steg 3)
+      OrbAnimator.cs       klotet: andning (idle) och tänkande (lila, 30 fps, steg 2); partiklar och färg per humör kommer i steg 3
       SpriteAnimator.cs    (senare) sprite sheets, samma gränssnitt
-      SpeechBubble.xaml    pratbubbla, Ja/Nej- och Ångra-knappar
-      ChatInput.xaml       textruta (klick eller kortkommando)
+      SpeechBubble.cs      pratbubbla (Popup, byggd i kod); Ja/Nej- och Ångra-knappar kommer i steg 5
+      ChatInput.cs         textruta (klick eller kortkommando)
+      ChatController.cs    kopplar klotet, textrutan, bubblan och samtalet; skapar allt vid första användning
     Brain/
-      IBrain.cs
+      IBrain.cs            IBrain, BrainChunk, ChatMessage
       ClaudeCodeBrain.cs   Claude-abonnemanget; en process per meddelande, förvärmd (D-055)
+      ClaudeProcess.cs     en `claude`-process (flaggor, stdin/stdout, avbrott)
+      Transcript.cs        de senaste 20 meddelandena som ett transkript + det nya
+      History.cs           historiken (memory/normal/history.jsonl), enda ägaren (D-055)
+      Fillers.cs           utfyllnadsord och FillerTuning (D-058); tillfällig lista till steg 3
       AnthropicBrain.cs    Claude med API-nyckel (valfritt)
       OpenAiCompatBrain.cs lokal modell, OpenRouter, OpenAI m.fl.
       ModelRouter.cs       Haiku eller Sonnet per meddelande
@@ -195,10 +205,12 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       IListener.cs, PushToTalk.cs
     Settings/
       SettingsWindow.xaml  flikar: Hjärna, Karaktär, Röst, Minne, Allmänt
-  tests/                   bl.a. läckagetestet mellan lägena
+  tests/                   Companion.Tests (xUnit, bara utveckling); läckagetestet mellan lägena kommer
 
 %APPDATA%\Companion\
   settings.json            val och inställningar (inga nycklar)
+  quota.json               dagens anrop per modell (version 1)
+  brain/                   tom arbetsmapp för claude-processen, plus system-prompt.txt (D-048)
   secrets.bin              DPAPI-krypterade nycklar
   personality.normal.json
   personality.flirty.json
@@ -229,7 +241,9 @@ public interface IBrain
         CancellationToken ct);
 }
 
-// BrainChunk = Text(string) | ToolCall(id, name, jsonArgs) | Done(usage)
+// BrainChunk = Text(string) | Thinking | ToolCall(id, name, jsonArgs) | Done(usage)
+// Thinking = ett tänkandeblock har börjat (för utfyllnadsorden, D-058). ToolCall kommer med verktygsloopen (steg 5).
+// IBrain har också PreWarm(systemPrompt) och CancelPreWarm() (D-055); de gör inget för hjärnor utan process.
 
 public interface ITool
 {
@@ -261,7 +275,9 @@ public interface IAnimator
 | --- | --- | --- |
 | `UserMessage(text, image?)` | ChatInput, PushToTalk | Conversation |
 | `ProactiveTrigger(reason)` | ActivityWatcher, ReminderTool | Conversation (om Quota tillåter) |
-| `ThinkingStarted` | Conversation | Animator |
+| `TurnStarted(TurnId)` | Conversation | alla som tar emot svarshändelser (de lär sig vilken tur som är aktuell) |
+| `ThinkingStarted(TurnId)` | Conversation, när ett utfyllnadsord visas (svaret är långsamt), inte vid varje väntan | Animator |
+| `Filler(TurnId, text)` | Conversation | SpeechBubble |
 | `ReplyChunk(text)` | Conversation | SpeechBubble, Voice (mening för mening) |
 | `ReplyDone(text, mood)` | Conversation | SpeechBubble, Animator |
 | `Interrupt` | ChatInput, PushToTalk, klick på klotet | Conversation, Voice |
@@ -294,7 +310,7 @@ Karaktären bor i ett litet WPF-fönster på 168 × 168 px (rymmer andningens st
 
 - Klotet består av två `Ellipse` (sken och kärna) med `RadialGradientBrush`, byggda av `OrbVisual`. Skenet är en ellips lika stor som greppringen vars gradient tonar ut till alfa 0 (ingen `BlurEffect`, ingen `DropShadowEffect`: båda ritas om dyrt när de animeras).
 - Varje humör är en `Storyboard`. WPF:s kompositor driver dem, så det finns ingen egen timer och ingen `CompositionTarget.Rendering`. Animeringen går via elementets egenskapssökväg (`(UIElement.RenderTransform).(ScaleTransform.ScaleX)`); att peka på själva `ScaleTransform`-objektet gav ingen effekt.
-- **Bildfrekvens efter aktivitet (D-051):** idle = andning (skala 1,14 och glödens ljusstyrka 0,55-0,90 i takt, 4 s, sine ease in-out) med `Timeline.DesiredFrameRate=10` (D-054, värdena står som konstanter i `Character/OrbTuning.cs`); kantutjämning på bråkdelar av en pixel (`UseLayoutRounding` och `SnapsToDevicePixels` av) så att varje bildruta skiljer sig; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst; thinking/talking kommer i steg 3, sleeping och spelläge i steg 4.
+- **Bildfrekvens efter aktivitet (D-051):** idle = andning (skala 1,14 och glödens ljusstyrka 0,55-0,90 i takt, 4 s, sine ease in-out) med `Timeline.DesiredFrameRate=10` (D-054, värdena står som konstanter i `Character/OrbTuning.cs`); kantutjämning på bråkdelar av en pixel (`UseLayoutRounding` och `SnapsToDevicePixels` av) så att varje bildruta skiljer sig; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst. Steg 2 lägger till en enkel thinking (lila ton, samma andning dubbelt så snabbt, 30 fps) som bara går medan ett utfyllnadsord visas (D-058); partiklar och talking kommer i steg 3, sleeping och spelläge i steg 4.
 - När fönstret är dolt (panikknappen) eller skärmen låst (`SessionSwitch`) stoppas storyboarden helt. Då ritas noll bilder.
 - Prövat och förkastat (P3b): att förrendera andningscykeln till ~40 bitmaps och byta bild med en timer gav ingen märkbar vinst (1,64 mot 1,77 % CPU, inom mätbruset) men ~10 MB mer RAM, en timer och DPI-problem. Koden finns kvar i `prototypes/P3b/`.
 - Dev-brytare, bara för mätning: `COMPANION_FPS`, `COMPANION_RENDER`, `COMPANION_PERF_FILE` (se README.md).
@@ -302,7 +318,7 @@ Karaktären bor i ett litet WPF-fönster på 168 × 168 px (rymmer andningens st
 
 **Pratbubblan** är ett eget litet `Popup`-fönster ovanför klotet. Den växer med texten upp till \~320 px bred, scrollar vid långa svar och tonar ut efter `max(6 s, 60 ms per tecken)`. Bubblan finns bara medan den visas.
 
-**Textinmatning:** klick på klotet eller ett globalt kortkommando (t.ex. Ctrl+Alt+Space via `RegisterHotKey`) öppnar en textruta under klotet. Enter skickar och Esc stänger.
+**Textinmatning:** klick på klotet eller ett globalt kortkommando (Ctrl+Alt+Space via `RegisterHotKey`, D-059; hård-kodad tills inställningarna i steg 4) öppnar en textruta under klotet, eller ovanför det om det inte finns plats under. Enter skickar och Esc stänger. Ett klick på klotet medan hon svarar avbryter svaret i stället för att öppna rutan. Bubblan göms medan textrutan är öppen.
 
 ## Hjärnan
 
@@ -316,7 +332,7 @@ Tre klasser täcker alla hjärnor. Normalt läge använder ditt Claude-abonneman
 
 **OpenAiCompatBrain** behöver bara bas-URL, nyckel och modellnamn. I det lokala läget är det Ollamas eller llama-servers adress på 127.0.0.1. Exempel på en hostad bas-URL: `https://generativelanguage.googleapis.com/v1beta/openai/`. Svaren strömmas (`stream: true`) så att bubblan fylls medan modellen skriver. Kostnaden är en `HttpClient` och några kilobyte.
 
-**ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --tools "" --strict-mcp-config --no-session-persistence --setting-sources project --safe-mode --disable-slash-commands --system-prompt-file …`). Lägsta version är Claude Code 2.1.318; äldre versioner saknar `--safe-mode` och filflaggorna. **Prototyp P1 avgjorde (D-055): en process per meddelande**, Capris sätt. Appen äger all historik och skickar de senaste 20 meddelandena som ett transkript tillsammans med det nya. Byte av modell, flirtnivå och läge kostar inget.
+**ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --tools "" --strict-mcp-config --no-session-persistence --setting-sources project --safe-mode --disable-slash-commands --system-prompt-file …`). Haiku-turer får dessutom `--effort low` (D-061) så att de oftare börjar med text än med ett tänkandeblock; andra modeller (Sonnet-eskaleringar) behåller standardnivån. Det minskar tänkandet men tar inte bort det (prov på 3 meddelanden, långa prompter kan fortfarande tänka); utfyllnadsorden (D-058) är reserven. Lägsta version är Claude Code 2.1.318; äldre versioner saknar `--safe-mode` och filflaggorna. **Prototyp P1 avgjorde (D-055): en process per meddelande**, Capris sätt. Appen äger all historik och skickar de senaste 20 meddelandena som ett transkript tillsammans med det nya. Byte av modell, flirtnivå och läge kostar inget.
 
 Startkostnaden (~850 ms per process) döljs genom **förvärmning**: processen startas när textrutan öppnas eller push-to-talk börjar, så starten överlappar med att du skriver, och meddelandet skrivs vid Enter. Stängs rutan utan att något skickas, eller går det 60 s, dödas den varma processen. Mätt i P1: första ordet ca 0,8 s (median) med förvärmning och 3 s skrivtid, mot ca 1,9 s utan. Haiku-svar i chatten ska köras utan utökat tänkande (Sonnet-eskaleringar får tänka). P1 hittade ingen brytare som tar bort tänkandet, men vanliga chattmeddelanden började aldrig med ett tänkandeblock, så mekanismen avgörs i steg 2 (D-055).
 
@@ -375,6 +391,8 @@ Påminnelser använder en enda `System.Threading.Timer` som ställs till nästa 
 Lyssning är push-to-talk med ett kortkommando; taligenkänningen väljs när vi kommer dit och laddas bara medan tangenten hålls ned.
 
 **Snabbhet och avbrott (efter Neuro-sama):** texten strömmas, och så fort första hela meningen har kommit skickas den till rösten medan resten fortfarande skrivs. Klotet börjar pulsera direkt när första ordet kommer. Hon slutar prata och avbryter pågående svar så fort du trycker push-to-talk, börjar skriva eller klickar på henne (`CancellationToken` till både hjärna och röst). Det avbrutna svaret sparas i historiken med markeringen `[interrupted]`, så hon vet att hon blev avbruten.
+
+**Utfyllnadsord (thinking fillers, D-058).** När svaret dröjer visar appen en kort lokal rad i bubblan, t.ex. "Hmm...", "Let me think..." eller "Give me a sec, hotshot.", och klotet byter till `thinking`. Det händer bara när ingen riktig text har kommit 1,5 s efter Enter. Ett tänkandeblock i strömmen utlöser ingenting (Haiku tänker på de flesta korta svar och texten kommer ändå på ca 1 s, så en sådan utlösare fick raden att blinka förbi). Inget modellanrop. Samma rad visas aldrig två gånger i rad, ingenting visas på snabba svar, raden ersätts av det riktiga svaret när det kommer och sparas aldrig i historiken. Tiden är en enda konstant, `FillerTuning.NoWordMs`. Tills personlighetsfilen finns (steg 3) ligger raderna i en tillfällig lista i `Brain/Fillers.cs`; steg 3 flyttar dem till `personality.normal.json` som `fillers`, en lista per läge. Utfyllnadsorden räknas inte som första ord i `perfcheck`.
 
 **Inställningar** är ett vanligt fönster som skapas när det öppnas och kastas när det stängs:
 
@@ -548,7 +566,7 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - [ ] **0. Repo.** Klona `SweKingdom/Cortana`, lägg till `dev-memory/`, `CLAUDE.md`, `NOTICE.md`, `.gitignore` och WPF-projektet på `net10.0-windows`. Bekräfta att `H.NotifyIcon.Wpf` och `System.Speech` fungerar där.
 - [ ] **1. Fönster och klot.** Genomskinligt, dragbart fönster med andande klot, tray-ikon med Avsluta, panikknapp, `perfcheck.ps1`. Innehåller prototyp **P3** (CPU i vila vid 30, 15 och 10 fps) och **P4** (klick-genomsläpp, `DragMove`, spellägets fönsterstilar över ett spel i borderless). *Klart när:* < 150 MB app-RAM, < 2 % CPU i vila (D-052), start < 1 s.
 - [ ] **Före steg 2: prototyp P1 och P2.** P1 (klar 2026-11-17, D-055, D-056): kör 20 turer med en process per meddelande och 20 med en process per session; mät första ord, RAM för `claude`-processen, `interrupt`, om `set_model` fungerar och tokenanvändning. P2 (klar 2026-11-17, D-057): 50 skriptade förfrågningar som kräver verktyg, inklusive två verktyg i ett svar och åtta utan verktyg; 0 trasiga och 0 läckta anrop, så textprotokollet behålls och MCP behövs inte. Variant B (bekräftelse och tagg i samma svar, andra process bara för `list_reminders` eller fel) vann över en andra process för varje anrop.
-- [ ] **2. Chatt med Claude.** Textruta, pratbubbla, `ClaudeCodeBrain` enligt P1, strömning, `ReplyCleaner`, avbrott med TurnId, kvoträknare, återhämtning (Driftregler, punkt 8), `ModeSession` för normalt läge. *Klart när:* första ordet inom \~2 s och hela trädet < 300 MB.
+- [x] **2. Chatt med Claude** (klar 2026-11-17: första ord 595 ms median med förvärmning, appen 92,7 MB, trädet i vila 92,7 MB). Textruta, pratbubbla, `ClaudeCodeBrain` enligt P1, strömning, `ReplyCleaner`, avbrott med TurnId, kvoträknare, återhämtning (Driftregler, punkt 8), `ModeSession` för normalt läge. *Klart när:* första ordet inom \~2 s och hela trädet < 300 MB.
 - [ ] **3. Personlighet, humör och minne.** Personlighetsfilen med exempel, flirtnivåer och `boundaries`, taggparser, aktivitet och uttryck till animation, minnesrader med id, Ångra, sammanfattning, minnestak och tokenbudget i `PromptBuilder`.
 - [ ] **4. Inställningar och spelläge.** Inställningsfönstret, `ModelRouter` (Haiku/Sonnet), Text/Röst, kortkommandon, spelläge, `ActivityWatcher` med initiativreglage och Stör ej.
 - [ ] **5. Verktyg.** Påminnelser och timers, öppna appar och sajter, de fem verktygsreglerna, Ja/Nej-bekräftelser med exakta argument, verktygsloopen enligt D-057 (fire-and-forget i en process, läs tillbaka eller fel i en andra, högst 3 rundor). Om `cancel_reminder` matchar flera påminnelser returneras träffarna så att hon frågar vilken; hon gissar aldrig.
@@ -574,12 +592,12 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 
 **Öppna frågor:**
 
-- Kortkommandon: chatt (förslag Ctrl+Alt+Space) och panik (förslag Ctrl+Alt+H).
+- Kortkommandon: chatt Ctrl+Alt+Space (D-059) och panik Ctrl+Alt+H (D-053) är bestämda och hård-kodade tills inställningarna i steg 4.
 - Exakta kvottak (30 spontana och 20 Sonnet-byten per dag är gissningar).
 - Vilken molnröst (t.ex. Fish Audio) och vilken röst? Bestäms efter alfarösten.
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-057) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-061) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

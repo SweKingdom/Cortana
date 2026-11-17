@@ -15,7 +15,10 @@ internal static class NativeMethods
     public const int WM_HOTKEY = 0x0312;
     public static readonly IntPtr HWND_MESSAGE = new(-3);
 
+    public const uint VK_SPACE = 0x20;
+
     public const uint MONITOR_DEFAULTTONULL = 0;
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const uint SWP_NOSIZE = 0x1, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -37,6 +40,22 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr MonitorFromRect(ref RECT lprc, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MONITORINFO { public int cbSize; public RECT rcMonitor, rcWork; public uint dwFlags; }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    /// <summary>Work area (screen minus taskbar) of the monitor the window is on, in physical pixels.</summary>
+    public static RECT WorkAreaOf(IntPtr hwnd)
+    {
+        var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        return GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), ref mi) ? mi.rcWork : default;
+    }
 
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
