@@ -29,9 +29,34 @@ internal sealed class History
     /// <summary>A finished or interrupted turn: the user's message and her reply (an interrupted one ends with [interrupted]).</summary>
     public void AppendTurn(string userText, string replyText, bool interrupted)
     {
-        var reply = interrupted ? (replyText.Length > 0 ? replyText + " " : "") + InterruptedMark : replyText;
         Add(new ChatMessage(Role.User, userText));
-        Add(new ChatMessage(Role.Assistant, reply));
+        Add(new ChatMessage(Role.Assistant, Format(replyText, interrupted)));
+    }
+
+    private static string Format(string replyText, bool interrupted)
+        => interrupted ? (replyText.Length > 0 ? replyText + " " : "") + InterruptedMark : replyText;
+
+    /// <summary>
+    /// Replaces her reply in the last saved turn (a finished reply whose display Philip cut short, D-063).
+    /// Rewrites the last line of the file, keeping its time.
+    /// </summary>
+    public void ReplaceLastReply(string replyText, bool interrupted)
+    {
+        if (_messages.Count == 0 || _messages[^1].Role != Role.Assistant) return;
+        var reply = Format(replyText, interrupted);
+        _messages[^1] = new ChatMessage(Role.Assistant, reply);
+        if (_path == null) return;
+        try
+        {
+            var lines = File.ReadAllLines(_path).ToList();
+            int i = lines.FindLastIndex(l => !string.IsNullOrWhiteSpace(l));
+            if (i < 0) return;
+            var old = JsonSerializer.Deserialize<Line>(lines[i], Json);
+            if (old is not { Role: "assistant" }) return;
+            lines[i] = JsonSerializer.Serialize(old with { Text = reply }, Json);
+            File.WriteAllLines(_path, lines);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException) { /* a failed save must not break the chat */ }
     }
 
     private void Add(ChatMessage m)

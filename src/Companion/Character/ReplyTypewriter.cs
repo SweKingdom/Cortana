@@ -36,6 +36,16 @@ internal sealed class ReplyTypewriter
         _last = Stopwatch.GetTimestamp();
     }
 
+    /// <summary>Shows everything that is waiting right now (a click on the bubble) and stops the timer.</summary>
+    public void Flush()
+    {
+        string rest = _pacer.Flush();
+        _timer.Stop();
+        _last = Stopwatch.GetTimestamp();
+        if (rest.Length > 0) _reveal(rest);
+        _drained();
+    }
+
     public void Push(string text)
     {
         if (text.Length == 0) return;

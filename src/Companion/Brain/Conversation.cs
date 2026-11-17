@@ -45,6 +45,29 @@ internal sealed class Conversation
     /// <summary>Usage of the last finished turn (first block type, tokens); for the perfcheck probe and logs.</summary>
     public BrainUsage? LastUsage { get; private set; }
 
+    /// <summary>
+    /// Says what part of a turn's reply was actually shown to Philip. An interrupted reply is saved to history as
+    /// only that part plus [interrupted] (D-063); unseen text is never saved. With no provider (tests, headless) the
+    /// whole produced text counts as seen.
+    /// </summary>
+    public Func<int, string>? ShownText { get; set; }
+
+    private int _savedTurn;               // the turn of the last history entry, and what was saved for it
+    private string _savedReply = "";
+    private bool _savedInterrupted;
+
+    /// <summary>
+    /// A reply finished and was saved in full, but Philip cut its display short (typing, a new message, panic) after
+    /// only part of it had been shown. The history entry becomes the shown part plus [interrupted] (D-063).
+    /// Does nothing for another turn, an entry that was already saved as interrupted, or a fully shown reply.
+    /// </summary>
+    public void TrimLastReply(int turn, string shown)
+    {
+        if (turn != _savedTurn || _savedInterrupted || shown.Length >= _savedReply.Length) return;
+        _history.ReplaceLastReply(shown, interrupted: true);
+        _savedInterrupted = true;
+    }
+
     /// <summary>The input opened or push-to-talk began: start the process now (D-055). Skipped while a reply runs.</summary>
     public void PreWarm() { if (_cts == null) _brain.PreWarm(PromptBuilder.BuildSystem()); }
     public void CancelPreWarm() => _brain.CancelPreWarm();
@@ -157,8 +180,9 @@ internal sealed class Conversation
         LastUsage = usage;
         if (gotText || usage != null) _quota.Record(usage?.Model is { Length: > 0 } m ? m : _quotaModel); // a call was made
         var reply = shown.ToString();
-        if (interrupted) _history.AppendTurn(text, reply, interrupted: true);        // she knows she was cut off
+        if (interrupted) _history.AppendTurn(text, ShownText?.Invoke(turn) ?? reply, interrupted: true);   // she knows she was cut off, and only knows what was shown
         else if (reply.Length > 0) _history.AppendTurn(text, reply, interrupted: false);
+        if (interrupted || reply.Length > 0) { _savedTurn = turn; _savedReply = reply; _savedInterrupted = interrupted; }
         Log.Event(interrupted ? "turn_interrupted" : "turn_done", ("turn", turn), ("ms", sw.ElapsedMilliseconds),
             ("block", usage?.FirstBlock), ("out_tokens", usage?.OutputTokens));
         _bus.Publish(new ReplyDone(turn, reply, interrupted));

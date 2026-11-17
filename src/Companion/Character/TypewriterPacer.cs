@@ -30,6 +30,14 @@ internal sealed class TypewriterPacer
         _buf = ""; _pos = 0; _credit = 0; _hold = 0; _fresh = true;
     }
 
+    /// <summary>Everything still buffered, at once (a click on the bubble). Pauses owed are dropped.</summary>
+    public string Flush()
+    {
+        string rest = _buf.Substring(_pos);
+        _buf = ""; _pos = 0; _credit = 0; _hold = 0; _fresh = false;
+        return rest;
+    }
+
     public void Push(string text)
     {
         if (text.Length == 0) return;

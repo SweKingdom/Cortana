@@ -20,8 +20,9 @@ internal sealed class ChatController : IDisposable
 
     private ModeSession? _session;
     private ChatInput? _input;
+    private readonly ShownText _shownText = new();   // what the bubble has shown this turn; history gets this on interrupt (D-063)
     private int _replyChars;      // characters received from the brain this turn
-    private int _shown;           // characters revealed in the bubble this turn
+    private bool _skipped;        // a click showed the rest: the remainder of this reply appears at once
     private bool _done;           // ReplyDone arrived
     private bool _fadeStarted;    // the bubble's countdown has been started for this reply
 
@@ -31,39 +32,49 @@ internal sealed class ChatController : IDisposable
         _turns = bus.TrackTurns(); // subscribed first, so Current is up to date before the handlers below run
         _bubble = new SpeechBubble(window.Orb);
         _typewriter = new ReplyTypewriter(OnReveal, OnDrained);
+        _bubble.SkipReveal = SkipReveal;
 
         window.OrbClicked += OnOrbClicked;
-        bus.Subscribe<UserMessage>(_ => _bubble.Hide());   // a new message ends a pinned bubble too
-        bus.Subscribe<TurnStarted>(_ =>
+        bus.Subscribe<UserMessage>(_ => { CutReveal(); _bubble.Hide(); });   // a new message ends a pinned bubble too
+        bus.Subscribe<TurnStarted>(e =>
         {
             _typewriter.Reset();
-            _replyChars = 0; _shown = 0; _done = false; _fadeStarted = false;
+            _shownText.Start(e.TurnId);
+            _replyChars = 0; _skipped = false; _done = false; _fadeStarted = false;
             _window.SetActivity(Activity.Idle);
         });
         bus.Subscribe<ThinkingStarted>(e => { if (_turns.IsCurrent(e.TurnId)) _window.SetActivity(Activity.Thinking); });
-        bus.Subscribe<Filler>(e => { if (_turns.IsCurrent(e.TurnId) && _input == null) _bubble.SetText(e.Text, filler: true); });
+        bus.Subscribe<Filler>(e => { if (_turns.IsCurrent(e.TurnId)) _bubble.SetText(e.Text, filler: true); });
         bus.Subscribe<ReplyChunk>(OnReplyChunk);
         bus.Subscribe<ReplyDone>(OnReplyDone);
         bus.Subscribe<TurnFailed>(OnTurnFailed);
         bus.Subscribe<Interrupt>(_ => OnInterrupt());
-        bus.Subscribe<PanicHide>(_ => { _typewriter.Reset(); _bubble.Hide(); _input?.Dismiss(); _window.SetActivity(Activity.Idle); });
+        bus.Subscribe<PanicHide>(_ => { CutReveal(); _bubble.Hide(); _input?.Dismiss(); _window.SetActivity(Activity.Idle); });
     }
 
     internal EventBus Bus => _bus;
-    internal ModeSession Session => _session ??= ModeSession.CreateNormal(_bus, _ephemeral);
+    internal ModeSession Session => _session ??= CreateSession();
+
+    private ModeSession CreateSession()
+    {
+        var session = ModeSession.CreateNormal(_bus, _ephemeral);
+        session.Conversation.ShownText = _shownText.For;   // an interrupted reply is saved as what was shown (D-063)
+        return session;
+    }
 
     /// <summary>Hotkey or click: open the text box (and pre-warm the process). Typing interrupts a running reply.</summary>
     public void OpenInput()
     {
         if (_input != null) { _input.Activate(); return; }
         var session = Session;
-        // The input takes the bubble's place, except a finished reply that Philip pinned: that stays until he sends.
-        if (!(_bubble.IsPinned && _fadeStarted && !_typewriter.HasPending)) { _typewriter.Reset(); _bubble.Hide(); }
+        // A reply that is running or still being revealed, and a pinned one, stay on screen while the input is open
+        // (typing interrupts, below). Only an old finished bubble that is just counting down makes way.
+        if (!(IsReplying || (_bubble.IsPinned && _fadeStarted))) { _typewriter.Reset(); _bubble.Hide(); }
         session.Conversation.PreWarm();
 
         var input = new ChatInput();
         _input = input;
-        input.Typing += () => { if (_session?.Conversation.IsBusy == true) _bus.Publish(new Interrupt()); };
+        input.Typing += () => { if (IsReplying) _bus.Publish(new Interrupt()); };
         input.Submitted += text => { _input = null; _bus.Publish(new UserMessage(text)); };
         input.Dismissed += () => { _input = null; _session?.Conversation.CancelPreWarm(); };
         input.ShowNear(_window);
@@ -79,8 +90,22 @@ internal sealed class ChatController : IDisposable
     private void OnOrbClicked()
     {
         if (_input != null) { _input.Dismiss(); return; }
-        if (_session?.Conversation.IsBusy == true) { _bus.Publish(new Interrupt()); return; } // click on a talking orb stops her
+        if (IsReplying) { _bus.Publish(new Interrupt()); return; } // click on a talking orb stops her
         OpenInput();
+    }
+
+    /// <summary>The brain is still producing the reply, or the typewriter is still revealing it.</summary>
+    private bool IsReplying => _session?.Conversation.IsBusy == true || _typewriter.HasPending;
+
+    /// <summary>
+    /// The reveal stops where it is. If the reply was already complete (and so already saved in full), the history
+    /// is cut back to what was shown (D-063). A reply still running is handled by its own interrupt.
+    /// </summary>
+    private void CutReveal()
+    {
+        bool cut = _typewriter.HasPending;
+        _typewriter.Reset();
+        if (cut && _done) _session?.Conversation.TrimLastReply(_turns.Current, _shownText.For(_turns.Current));
     }
 
     private void OnReplyChunk(ReplyChunk e)
@@ -88,16 +113,25 @@ internal sealed class ChatController : IDisposable
         if (!_turns.IsCurrent(e.TurnId)) return;
         _window.SetActivity(Activity.Idle);
         _replyChars += e.Text.Length;
-        if (_input != null) return;
+        if (_skipped) { OnReveal(e.Text); return; }   // Philip clicked to see it all: the rest of this reply is not paced
         _typewriter.Push(e.Text);   // the first character shows at once and replaces the filler; the rest is paced (D-063)
     }
 
     /// <summary>A piece of the reply is due: the first one replaces the filler or the old reply.</summary>
     private void OnReveal(string text)
     {
-        bool first = _shown == 0;
-        _shown += text.Length;
+        bool first = _shownText.Length == 0;
+        _shownText.Add(text);
         if (first) _bubble.SetText(text, filler: false); else _bubble.Append(text);
+    }
+
+    /// <summary>Click on the bubble while text is still waiting: show it all now. False when nothing was waiting (the click pins instead).</summary>
+    private bool SkipReveal()
+    {
+        if (!_typewriter.HasPending) return false;
+        _skipped = true;
+        _typewriter.Flush();
+        return true;
     }
 
     /// <summary>Everything received so far is on screen. If the reply is complete, the bubble's countdown starts now.</summary>
@@ -117,7 +151,6 @@ internal sealed class ChatController : IDisposable
     {
         if (!_turns.IsCurrent(e.TurnId)) return;
         _window.SetActivity(Activity.Idle);
-        if (_input != null) return;
         _done = true;
         if (e.Interrupted) { StopWhereItIs(); return; }
         if (_replyChars == 0) { _bubble.Hide(); return; }   // nothing to read (or a filler left over)
@@ -133,8 +166,8 @@ internal sealed class ChatController : IDisposable
     /// <summary>Interrupted: the text stops where it is and stays readable for its normal time; nothing shown means nothing to keep.</summary>
     private void StopWhereItIs()
     {
-        _typewriter.Reset();
-        if (_shown > 0 && _bubble.IsOpen && !_bubble.ShowsFiller) StartCountdown(_shown);
+        CutReveal();
+        if (_shownText.Length > 0 && _bubble.IsOpen && !_bubble.ShowsFiller) StartCountdown(_shownText.Length);
         else _bubble.Hide();
     }
 
@@ -143,7 +176,6 @@ internal sealed class ChatController : IDisposable
         if (!_turns.IsCurrent(e.TurnId)) return;
         _window.SetActivity(Activity.Idle);
         _typewriter.Reset();
-        if (_input != null) return;
         var text = FailText(e.Kind);
         _bubble.SetText(text, filler: false);
         _bubble.StartFade(text.Length);

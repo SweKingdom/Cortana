@@ -124,6 +124,117 @@ public class ConversationTests
     }
 
     [Fact]
+    public async Task InterruptSavesOnlyTheTextThatWasShownPlusTheMark()
+    {
+        var r = new Rig();
+        var firstChunk = new TaskCompletionSource();
+        r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
+        // the brain produced "Once upon a time, ", the bubble had only revealed "Once up"
+        r.Conv.ShownText = turn => turn == 1 ? "Once up" : "";
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Once upon a time, ")), (10_000, new TextChunk("never")));
+        var send = r.Conv.SendAsync("tell me a story");
+        await firstChunk.Task;
+        r.Conv.Interrupt();
+        await send;
+        Assert.Equal("Once up [interrupted]", r.History.Messages[1].Text);
+        Assert.DoesNotContain(r.History.Messages, m => m.Text.Contains("upon a time"));
+    }
+
+    [Fact]
+    public async Task InterruptBeforeAnythingWasShownSavesOnlyTheMark()
+    {
+        var r = new Rig();
+        var firstChunk = new TaskCompletionSource();
+        r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
+        r.Conv.ShownText = _ => "";
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Secret words that nobody saw. ")), (10_000, new TextChunk("x")));
+        var send = r.Conv.SendAsync("hello");
+        await firstChunk.Task;
+        r.Conv.Interrupt();
+        await send;
+        Assert.Equal("[interrupted]", r.History.Messages[1].Text);
+    }
+
+    [Fact]
+    public async Task TheNextTranscriptAfterAnInterruptHasOnlyTheShownText()
+    {
+        var r = new Rig();
+        var firstChunk = new TaskCompletionSource();
+        r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
+        r.Conv.ShownText = turn => turn == 1 ? "Long" : "";
+        r.Brain.Script = (n, ct) => n == 1
+            ? FakeBrain.Steps(ct, (0, new TextChunk("Long answer that goes on ")), (10_000, new TextChunk("x")))
+            : FakeBrain.Steps(ct, (0, new TextChunk("Sure. [idle]")), (0, FakeBrain.Done()));
+        var first = r.Conv.SendAsync("one");
+        await firstChunk.Task;
+        var second = r.Conv.SendAsync("two");
+        await Task.WhenAll(first, second);
+        Assert.Contains(r.Brain.Calls[1], m => m.Role == Role.Assistant && m.Text == "Long [interrupted]");
+        Assert.DoesNotContain(r.Brain.Calls[1], m => m.Text.Contains("goes on"));
+    }
+
+    private static async Task<Rig> FinishedReply()
+    {
+        var r = new Rig();
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Once upon a time, there was a PC.")), (0, FakeBrain.Done()));
+        await r.Conv.SendAsync("story");
+        Assert.Equal("Once upon a time, there was a PC.", r.History.Messages[1].Text);
+        return r;
+    }
+
+    [Fact]
+    public async Task ACompletedReplyCutShortOnScreenIsTrimmedInTheHistory()
+    {
+        var r = await FinishedReply();
+        r.Conv.TrimLastReply(1, "Once upon");
+        Assert.Equal("Once upon [interrupted]", r.History.Messages[1].Text);
+        Assert.Equal(2, r.History.Messages.Count);
+    }
+
+    [Fact]
+    public async Task TrimmingWithNothingShownLeavesOnlyTheMark()
+    {
+        var r = await FinishedReply();
+        r.Conv.TrimLastReply(1, "");
+        Assert.Equal("[interrupted]", r.History.Messages[1].Text);
+    }
+
+    [Fact]
+    public async Task TrimmingDoesNothingWhenAllWasShownOrForAnotherTurn()
+    {
+        var r = await FinishedReply();
+        r.Conv.TrimLastReply(1, "Once upon a time, there was a PC.");
+        Assert.Equal("Once upon a time, there was a PC.", r.History.Messages[1].Text);
+        r.Conv.TrimLastReply(7, "Once");
+        Assert.Equal("Once upon a time, there was a PC.", r.History.Messages[1].Text);
+    }
+
+    [Fact]
+    public async Task TrimmingTwiceKeepsTheFirstCut()
+    {
+        var r = await FinishedReply();
+        r.Conv.TrimLastReply(1, "Once upon a");
+        r.Conv.TrimLastReply(1, "Once");
+        Assert.Equal("Once upon a [interrupted]", r.History.Messages[1].Text);
+    }
+
+    [Fact]
+    public async Task TrimmingNeverTouchesAnInterruptedEntry()
+    {
+        var r = new Rig();
+        var firstChunk = new TaskCompletionSource();
+        r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
+        r.Conv.ShownText = _ => "Once up";
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Once upon a time, ")), (10_000, new TextChunk("x")));
+        var send = r.Conv.SendAsync("story");
+        await firstChunk.Task;
+        r.Conv.Interrupt();
+        await send;
+        r.Conv.TrimLastReply(1, "Once");
+        Assert.Equal("Once up [interrupted]", r.History.Messages[1].Text);
+    }
+
+    [Fact]
     public async Task ANewMessageInterruptsAndTheNextTranscriptKnowsAboutIt()
     {
         var r = new Rig();

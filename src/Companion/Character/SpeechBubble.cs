@@ -40,6 +40,9 @@ internal sealed class SpeechBubble
 
     public SpeechBubble(FrameworkElement target) => _target = target;
 
+    /// <summary>Set by the owner: called on a click; returns true when it showed text that was still waiting (the click is used up).</summary>
+    public Func<bool>? SkipReveal { get; set; }
+
     public bool IsOpen => _popup is { IsOpen: true };
     public bool IsPinned => _pinned;
     /// <summary>True while the bubble shows a filler line (to be replaced by the real reply).</summary>
@@ -150,6 +153,8 @@ internal sealed class SpeechBubble
         _border.MouseLeave += (_, _) => { _hover = false; UpdatePause(); };
         _border.MouseLeftButtonUp += (_, e) =>
         {
+            // While text is still being revealed a click shows the rest at once instead of pinning (D-063).
+            if (SkipReveal?.Invoke() == true) { e.Handled = true; return; }
             _pinned = !_pinned;
             if (_border != null) _border.BorderBrush = _pinned ? PinnedBorder : NormalBorder;
             UpdatePause();

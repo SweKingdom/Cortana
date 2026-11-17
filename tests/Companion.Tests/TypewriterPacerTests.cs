@@ -59,20 +59,62 @@ public class TypewriterPacerTests
     }
 
     [Fact]
+    public void CatchUpStartsOnlyBeyondTheThresholdAndIsCapped()
+    {
+        Assert.Equal(16, TypewriterTuning.BaseCps);
+        Assert.Equal(40, TypewriterTuning.MaxCps);
+        Assert.Equal(250, TypewriterTuning.CatchUpFromChars);
+        Assert.Equal(TypewriterTuning.BaseCps, TypewriterPacer.RateCps(250));      // at the threshold: still speech pace
+        Assert.True(TypewriterPacer.RateCps(251) > TypewriterTuning.BaseCps);       // just beyond: a little faster
+        Assert.Equal(TypewriterTuning.MaxCps, TypewriterPacer.RateCps(10_000));
+    }
+
+    [Fact]
     public void LongTextIsFasterThanTheBasePaceButNeverFasterThanTheCap()
     {
         var p = With(new string('a', 600));
         var (ms, text) = Drain(p);
         Assert.Equal(600, text.Length);
-        Assert.True(ms < 600 * 1000.0 / TypewriterTuning.BaseCps * 0.6, $"long reply dragged: {ms} ms");
+        Assert.True(ms < 600 * 1000.0 / TypewriterTuning.BaseCps * 0.8, $"long reply dragged: {ms} ms");
         Assert.True(ms > 600 * 1000.0 / TypewriterTuning.MaxCps * 0.95, $"faster than the cap: {ms} ms");
+    }
+
+    [Fact]
+    public void ATextUnderTheThresholdNeverSpeedsUp()
+    {
+        var p = With(new string('a', TypewriterTuning.CatchUpFromChars));
+        var (ms, _) = Drain(p);
+        double expected = (TypewriterTuning.CatchUpFromChars - 1) * 1000.0 / TypewriterTuning.BaseCps;
+        Assert.InRange(ms, expected - 25, expected + 25);
+    }
+
+    [Fact]
+    public void FlushGivesTheRestAtOnceInOrderAndLeavesNothing()
+    {
+        var p = With("Hello there. How are you, friend?");
+        string first = p.Advance(0) + p.Advance(500);       // part of it is shown
+        string rest = p.Flush();
+        Assert.Equal("Hello there. How are you, friend?", first + rest);
+        Assert.False(p.HasPending);
+        Assert.Equal("", p.Advance(60_000));
+    }
+
+    [Fact]
+    public void FlushDropsAPauseThatWasStillOwed()
+    {
+        var p = With("Hi. Next");
+        while (p.HasPending && !p.Advance(1).Contains('.')) { }   // run up to the full stop: a pause is now owed
+        string rest = p.Flush();
+        Assert.Equal(" Next", rest);
+        p.Push(" more");
+        Assert.NotEqual("", p.Advance(100));                        // one character interval is 62 ms; a leftover 400 ms pause would block this
     }
 
     [Fact]
     public void SentenceEndAndCommaAddAPause()
     {
         double Time(string s) => Drain(With(s)).Ms;
-        double plain = Time("aaaa bbbb cccc");
+        double plain = Time("aaaax bbbb cccc");   // same length, so only the pause differs
         double comma = Time("aaaa, bbbb cccc");
         double sentence = Time("aaaa. bbbb cccc");
         Assert.InRange(comma - plain, TypewriterTuning.CommaPauseMs - 25, TypewriterTuning.CommaPauseMs + 25);
@@ -89,8 +131,8 @@ public class TypewriterPacerTests
     [Fact]
     public void AnEllipsisPausesOnlyAfterTheLastDot()
     {
-        double plain = Drain(With("wait xxx go")).Ms;
-        double dots = Drain(With("wait... go")).Ms;   // 3 dots replace "xxx", pause once at the end
+        double plain = Drain(With("waitxxx go")).Ms;
+        double dots = Drain(With("wait... go")).Ms;   // same length; the 3 dots pause once, after the last one
         Assert.InRange(dots - plain, TypewriterTuning.SentencePauseMs - 25, TypewriterTuning.SentencePauseMs + 25);
     }
 
@@ -134,8 +176,8 @@ public class TypewriterPacerTests
     public void StopWhereItIsDropsTheRest()
     {
         var p = With("This will be cut off in the middle of the sentence.");
-        string shown = p.Advance(0) + p.Advance(200);   // about 10 characters
-        Assert.InRange(shown.Length, 5, 15);
+        string shown = p.Advance(0) + p.Advance(1000);   // about 17 characters at 16 cps
+        Assert.InRange(shown.Length, 10, 25);
         p.Reset();                                       // what an interrupt does
         Assert.False(p.HasPending);
         Assert.Equal("", p.Advance(60_000));
