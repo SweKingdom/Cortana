@@ -31,4 +31,4 @@ Owns next steps and blockers. Done criteria are measured with tools/perfcheck.ps
 
 ## Blockers
 
-- None for step 4. The P4 game test (Philip) is still open. Idle CPU has no margin under 2%: noise is about 0.5 points and a plain run measured 2.14% (FAIL) in the same session that a pinned flirty bubble measured 1.98%. If a step 4 change adds idle cost, decide before merging whether D-052 needs another look rather than re-running until it passes.
+- None for step 4. The P4 game test (Philip) is still open. Step 3 follow-ups before merge (D-070 to D-073): mood held between messages (10 min hold, 60 s fade), chat input stays open, summary runs while the box is empty, typing no longer interrupts a reply. Idle CPU after them: held flirty 1.93%, plain 1.98% (median of 3 each); first word real flow 639 ms. Idle CPU has no margin under 2%: noise is about 0.5 points and a plain run measured 2.14% (FAIL) in the same session that a pinned flirty bubble measured 1.98%. If a step 4 change adds idle cost, decide before merging whether D-052 needs another look rather than re-running until it passes.
