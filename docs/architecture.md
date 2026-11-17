@@ -177,7 +177,10 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       IAnimator.cs         Activity-enum och SetActivity (SetExpression kommer i steg 3)
       OrbAnimator.cs       klotet: andning (idle) och tänkande (lila, 30 fps, steg 2); partiklar och färg per humör kommer i steg 3
       SpriteAnimator.cs    (senare) sprite sheets, samma gränssnitt
-      SpeechBubble.cs      pratbubbla (Popup, byggd i kod); Ja/Nej- och Ångra-knappar kommer i steg 5
+      SpeechBubble.cs      pratbubbla (Popup, byggd i kod); livslängd, paus vid hovring, fastnålning (D-062); Ja/Nej- och Ångra-knappar kommer i steg 5
+      ChatTuning.cs        konstanterna för bubblans livslängd (BubbleTuning) och skrivmaskinsvisningen (TypewriterTuning) på ett ställe
+      TypewriterPacer.cs   takten för skrivmaskinsvisningen (D-063), ren logik utan timer och UI, enhetstestad
+      ReplyTypewriter.cs   timern som kör takten; går bara medan text väntar på att visas
       ChatInput.cs         textruta (klick eller kortkommando)
       ChatController.cs    kopplar klotet, textrutan, bubblan och samtalet; skapar allt vid första användning
     Brain/
@@ -316,9 +319,11 @@ Karaktären bor i ett litet WPF-fönster på 168 × 168 px (rymmer andningens st
 - Dev-brytare, bara för mätning: `COMPANION_FPS`, `COMPANION_RENDER`, `COMPANION_PERF_FILE` (se README.md).
 - Version 2 med sprites använder en `DispatcherTimer` som bara går medan en animation spelas och visar `CroppedBitmap`-rutor från ett förladdat ark.
 
-**Pratbubblan** är ett eget litet `Popup`-fönster ovanför klotet. Den växer med texten upp till \~320 px bred, scrollar vid långa svar och tonar ut efter `max(6 s, 60 ms per tecken)`. Bubblan finns bara medan den visas.
+**Pratbubblan** är ett eget litet `Popup`-fönster ovanför klotet. Den växer med texten upp till \~320 px bred, scrollar vid långa svar och tonar ut `max(8 s, 90 ms per tecken)` efter att sista tecknet har visats (D-062; värdena i `BubbleTuning`). Håller du musen över bubblan pausas nedräkningen; ett klick fäster bubblan tills du klickar igen eller skickar ett nytt meddelande (då försvinner den). Bubblan finns bara medan den visas.
 
-**Textinmatning:** klick på klotet eller ett globalt kortkommando (Ctrl+Alt+Space via `RegisterHotKey`, D-059; hård-kodad tills inställningarna i steg 4) öppnar en textruta under klotet, eller ovanför det om det inte finns plats under. Enter skickar och Esc stänger. Ett klick på klotet medan hon svarar avbryter svaret i stället för att öppna rutan. Bubblan göms medan textrutan är öppen.
+**Skrivmaskinsvisning (D-063).** Svarstexten visas i jämn takt i stället för i råa strömbitar: grundtakt ca 45 tecken/s, som ökar gradvis när mycket text väntar (så att långa svar inte drar ut) upp till ett tak, och korta pauser efter `.` `?` `!` och efter komma. Första tecknet visas direkt när första biten kommer, så tiden till första ord ändras inte. Vid avbrott slutar texten där den är och blir stående lika länge som vanligt. Timern (`ReplyTypewriter`) går bara medan text visas och stannar när allt är synligt, så den kostar inget i vila. Takten är ren logik i `TypewriterPacer`, och alla värden finns i `TypewriterTuning`.
+
+**Textinmatning:** klick på klotet eller ett globalt kortkommando (Ctrl+Alt+Space via `RegisterHotKey`, D-059; hård-kodad tills inställningarna i steg 4) öppnar en textruta under klotet, eller ovanför det om det inte finns plats under. Enter skickar och Esc stänger. Ett klick på klotet medan hon svarar avbryter svaret i stället för att öppna rutan. Bubblan göms medan textrutan är öppen, utom en färdig bubbla som du har fäst: den ligger kvar tills du skickar.
 
 ## Hjärnan
 
@@ -598,6 +603,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-061) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-063) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.
