@@ -171,7 +171,7 @@ if (mode == "history")
 }
 
 // ============================== compare ==============================
-if (mode == "compare" || mode == "compare2")
+if (mode == "compare" || mode == "compare2" || mode == "compare3")
 {
     var wed = new DateTime(2026, 11, 18);
     var cases1 = new (string Label, TimeSpan At, (string, string)[] Hist, string Msg)[]
@@ -201,13 +201,24 @@ if (mode == "compare" || mode == "compare2")
         ("bad idea",       new(13, 40, 0), Array.Empty<(string, string)>(), "I'm thinking of quitting my job to make a game full time, starting next week"),
         ("late night",     new(2, 10, 0),  Array.Empty<(string, string)>(), "can't sleep, brain won't shut up"),
     };
-    var cases = mode == "compare2" ? cases2 : cases1;
-    var setups = new (string Id, string Model, string? Effort)[] { ("haiku-low", "haiku", "low"), ("haiku-default", "haiku", null), ("sonnet", "sonnet", null) };
+    // Run 3 (v2.2 personality): five new messages, Sonnet at its default effort against Sonnet at --effort low.
+    var cases3 = new (string Label, TimeSpan At, (string, string)[] Hist, string Msg)[]
+    {
+        ("greeting",     new(9, 30, 0),  Array.Empty<(string, string)>(), "good morning, coffee first"),
+        ("frustration",  new(15, 50, 0), Array.Empty<(string, string)>(), "my merge conflict has 40 files in it and I want to throw the laptop"),
+        ("game",         new(23, 10, 0), Array.Empty<(string, string)>(), "finally hit diamond in ranked"),
+        ("question",     new(13, 20, 0), Array.Empty<(string, string)>(), "should I learn Rust or just get better at C#?"),
+        ("sad",          new(0, 40, 0),  Array.Empty<(string, string)>(), "feeling kind of lonely tonight"),
+    };
+    var cases = mode == "compare3" ? cases3 : mode == "compare2" ? cases2 : cases1;
+    var setups = mode == "compare3"
+        ? new (string Id, string Model, string? Effort)[] { ("sonnet-default", "sonnet", null), ("sonnet-low", "sonnet", "low") }
+        : new (string Id, string Model, string? Effort)[] { ("haiku-low", "haiku", "low"), ("haiku-default", "haiku", null), ("sonnet", "sonnet", null) };
     var builder = NewBuilder(null, 4);
-    var rng = new Random(mode == "compare2" ? 3_003 : 3_002);   // fixed seed: the letter order is repeatable
+    var rng = new Random(mode == "compare3" ? 3_004 : mode == "compare2" ? 3_003 : 3_002);   // fixed seed: the letter order is repeatable
     var results = new List<(int Case, string Setup, Turn T)>();
     var key = new Dictionary<int, Dictionary<string, string>>();
-    var blind = new StringBuilder("# Blind comparison, step 3b\n\nTen messages, three replies each, letters shuffled per message. Judge each reply on its own: voice, wit, length, whether she stays Cortana.\nThe key is in sealed/key.json. Do not open it until you have judged.\n\n");
+    var blind = new StringBuilder($"# Blind comparison, step 3b\n\n{cases.Length} messages, {setups.Length} replies each, letters shuffled per message. Judge each reply on its own: voice, wit, length, whether she stays Cortana.\nThe key is in sealed/key.json. Do not open it until you have judged.\n\n");
 
     for (int c = 0; c < cases.Length; c++)
     {
@@ -219,11 +230,11 @@ if (mode == "compare" || mode == "compare2")
         {
             var t = await RunTurn(s.Model, s.Effort, SysFile("compare-system.txt", sys), stdin, 3000);
             got[s.Id] = t; results.Add((c, s.Id, t));
-            Console.WriteLine($"[{c + 1}/10 {cs.Label}] {s.Id}: first word {t.FirstWordMs:F0} ms, block {t.FirstBlock}, resolved {t.ResolvedModel}, err {t.Error}");
+            Console.WriteLine($"[{c + 1}/{cases.Length} {cs.Label}] {s.Id}: first word {t.FirstWordMs:F0} ms, block {t.FirstBlock}, resolved {t.ResolvedModel}, err {t.Error}");
         }
-        var letters = new[] { "A", "B", "C" }; var shuffled = setups.Select(s => s.Id).OrderBy(_ => rng.Next()).ToArray();
+        var letters = new[] { "A", "B", "C" }.Take(setups.Length).ToArray(); var shuffled = setups.Select(s => s.Id).OrderBy(_ => rng.Next()).ToArray();
         key[c + 1] = new(); blind.AppendLine($"## {c + 1}. {(cs.Hist.Length > 0 ? "(after: \"" + cs.Hist[0].Item2 + "\" / \"" + cs.Hist[1].Item2 + "\")  " : "")}Philip ({(wed + cs.At):HH:mm}): {cs.Msg}\n");
-        for (int k = 0; k < 3; k++)
+        for (int k = 0; k < setups.Length; k++)
         {
             key[c + 1][letters[k]] = shuffled[k];
             blind.AppendLine($"**{letters[k]}:** {got[shuffled[k]].Reply.Trim()}\n");

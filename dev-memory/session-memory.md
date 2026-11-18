@@ -155,3 +155,13 @@ Rules:
 - Design changed: docs/architecture.md (personality section, budget, interrupt lines, model choice, ReplyCleaner, `ReplyLeak`, tooltip, D-001 to D-077). Philip updates the claude.ai doc to match.
 - Last confirmed action: Philip's instructions to copy v2.2, add the 400 ms guard, propose D-076 with Sonnet as default and a tooltip count, measure with perfcheck, write the dev-memory entries, commit, push and open the pull request.
 - Next: Sonnet first word (test `--effort low` on Sonnet or change the budget); step 4 (settings, ModelRouter, quota caps); P4 game test (Philip).
+
+### Follow-up on step-3b-personality, same day (Claude, requested by Philip after the PR was opened)
+
+- Asked: try Sonnet with `--effort low`, a small blind check (run 3), confirm idle and start to orb with the guard, and add ModelRouter design notes to step 4 (fast/slow routing with proposed rules, context-aware fillers, a later speculative start).
+- Added: `COMPANION_CHAT_EFFORT` override (`ClaudeCodeBrain(model, effort)`, measuring only; the default is unchanged: Sonnet at default effort), `compare3` mode in the harness, `out/run3/` (blind file and sealed key, key not opened), the design notes in checklist.md step 4.
+- Measured: Sonnet low first word 1 931 ms median (default effort 3 016), thinking first 11 of 15 (15 of 15). Run 3 harness: 3 104 against 2 899 ms median, 4 of 5 thinking first in both, equal cost proxy. Idle median of 3: 2.55% and 1.80% on the branch, 2.21% on `main` in the same session; start to orb 436 to 447 ms; 76.5 MB. Noise, not an effect.
+- Changed by me: D-076 status ACCEPTED to PROPOSED and D-013 back to ACCEPTED, because Philip said D-076 is still to be decided; I had written it as ACCEPTED from his earlier instruction.
+- Uncertain: the idle CPU limit has no margin on this PC (three medians either side of 2%); one run of 10 for Sonnet low.
+- Last confirmed action: Philip's instructions above. Waiting for Philip to judge `out/run3/blind.md`.
+- Next: Philip judges run 3, then decide D-076 and the Sonnet effort; then step 4.

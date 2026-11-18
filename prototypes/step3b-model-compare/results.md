@@ -166,5 +166,21 @@ The guard would have dropped 6B; 9B of run 1 ("Philip skriver på svenska, ...")
 | --- | --- | --- | --- | --- |
 | Sonnet (default, D-076) | 3 016 / 4 246 / 6 314 ms | 3 977 ms | 15 of 15 | 14 of 15 |
 | Haiku `--effort low` | 937 / 2 274 / 2 627 ms | 2 799 ms | 6 of 15 | 7 of 15 |
+| Sonnet `--effort low` (`COMPANION_CHAT_EFFORT=low`) | 1 931 / 3 719 / 3 833 ms | 2 873 ms | 11 of 15 | 13 of 15 |
 
-Sonnet is over the ~2 s first-word budget in the app; the blind harness (1 630 ms median, 7 of 10 thinking first on v2.1) understated it. `--effort low` was not tried on Sonnet.
+Sonnet at its default effort is over the ~2 s first-word budget in the app; the blind harness (1 630 ms median, 7 of 10 thinking first on v2.1) understated it. Sonnet with `--effort low` came to 1 931 ms median, just under the budget (PASS by 69 ms, one run of 10, p90 3 719 ms), with a thinking block first on 11 of 15 turns instead of 15 of 15, and a filler on 13 of 15. Cold turns 2 873 ms against 3 977 ms.
+
+## Run 3 (v2.2): Sonnet default effort against Sonnet `--effort low`
+
+`ModelCompare compare3`, same blind format, new sealed key. Five new messages (a morning greeting, a 40-file merge conflict, reaching diamond in ranked, "Rust or C#?", feeling lonely at 00:40), two setups, letters A and B shuffled per message (seed 3004). The personality is the v2.2 default at flirt level 4. Blind file: `out/run3/blind.md`; key: `out/run3/sealed/key.json` (not opened when this section was written).
+
+| Setup | First word median / p90 / max | Thinking block first | Mood tag at the end | Median reply chars | Fresh in / cache write / cache read / out tokens | API-equivalent cost |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sonnet default | 3 104 / 4 613 / 4 613 ms | 4 of 5 | 5 of 5 | 383 | 10 / 3 891 / 16 423 / 1 774 | $0.0359 |
+| Sonnet low | 2 899 / 3 499 / 3 499 ms | 4 of 5 | 5 of 5 | 338 | 10 / 4 310 / 16 001 / 1 635 | $0.0361 |
+
+No errors, no leaked tool markup. Both resolved to `claude-sonnet-5-5`. Five calls each: the timing difference (200 ms) is inside the noise; in this harness `--effort low` did not change the thinking-first count, while in the app's real flow it went from 15 of 15 to 11 of 15. Quota proxy is the same for both.
+
+### Run 3: Philip's picks and what they were
+
+Pending: Philip has not judged `out/run3/blind.md` yet.

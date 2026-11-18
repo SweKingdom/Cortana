@@ -31,7 +31,7 @@ internal sealed class ModeSession : IDisposable
         var personality = new PersonalitySource(ephemeral ? null : AppPaths.PersonalityNormal);
         var prompts = new PromptBuilder(personality, () => settings?.FlirtLevel ?? 4, memory);
         var chatModel = ClaudeCodeBrain.ChatModelFromEnvironment();
-        var brain = new ClaudeCodeBrain(chatModel);                           // the chat (Sonnet, D-076)
+        var brain = new ClaudeCodeBrain(chatModel, ClaudeCodeBrain.ChatEffortFromEnvironment(chatModel));                           // the chat (Sonnet, D-076)
         var lightBrain = new ClaudeCodeBrain(ClaudeCodeBrain.LightModel);     // the summary: Haiku at low effort
         var summarizer = new Summarizer(lightBrain, history, memory, quota);
         var conversation = new Conversation(bus, brain, history, quota, chatModel,

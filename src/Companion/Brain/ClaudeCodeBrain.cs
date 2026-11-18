@@ -18,6 +18,9 @@ internal sealed class ClaudeCodeBrain : IBrain
     public const string ChatModel = "sonnet";
     /// <summary>The cheap model for the summary and proactive comments (D-076).</summary>
     public const string LightModel = "haiku";
+    /// <summary>Dev override for measuring: COMPANION_CHAT_EFFORT=low (or "default" for none) replaces <see cref="EffortFor"/> for the chat brain.</summary>
+    public static string? ChatEffortFromEnvironment(string model)
+        => Environment.GetEnvironmentVariable("COMPANION_CHAT_EFFORT") is { Length: > 0 } e ? (e == "default" ? null : e) : EffortFor(model);
     /// <summary>The model the chat runs on: <see cref="ChatModel"/>, or what COMPANION_CHAT_MODEL says (read once; for perfcheck).</summary>
     public static string ChatModelFromEnvironment()
         => Environment.GetEnvironmentVariable("COMPANION_CHAT_MODEL") is { Length: > 0 } m ? m : ChatModel;
@@ -32,7 +35,12 @@ internal sealed class ClaudeCodeBrain : IBrain
     private string? _warmPrompt;
     private Timer? _warmTimer;
 
-    public ClaudeCodeBrain(string model = ChatModel) => _model = model;
+    private readonly string? _effort;
+    public ClaudeCodeBrain(string model = ChatModel, string? effort = "auto")
+    {
+        _model = model;
+        _effort = effort == "auto" ? EffortFor(model) : effort;
+    }
 
     public string Name => "ClaudeCode";
     public bool SupportsVision => false;
@@ -46,7 +54,7 @@ internal sealed class ClaudeCodeBrain : IBrain
             DropWarm();
             try
             {
-                _warm = ClaudeProcess.Start(_model, WriteSystemFile(systemPrompt), EffortFor(_model));
+                _warm = ClaudeProcess.Start(_model, WriteSystemFile(systemPrompt), _effort);
                 _warmPrompt = systemPrompt;
                 _warmTimer = new Timer(_ => CancelPreWarm(), null, WarmLifetimeMs, Timeout.Infinite); // one-shot, not a poll
                 Log.Event("prewarm_start");
@@ -84,7 +92,7 @@ internal sealed class ClaudeCodeBrain : IBrain
             DropWarm();
         }
         wasWarm = false;
-        return ClaudeProcess.Start(_model, WriteSystemFile(systemPrompt), EffortFor(_model));
+        return ClaudeProcess.Start(_model, WriteSystemFile(systemPrompt), _effort);
     }
 
     private static string WriteSystemFile(string prompt)

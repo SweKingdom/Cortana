@@ -1,0 +1,7 @@
+Per setup (the numbers do not say which letter is which):
+sonnet-default (claude-sonnet-5-5, effort default): first word median 3104 ms, p90 4613 ms, max 4613 ms (n=5); thinking block first 4 of 5; errors 0
+   quota: 5 calls; tokens fresh-in 10, cache-write 3891, cache-read 16423, out 1774; API-equivalent cost 0,0359 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 5 of 5; leaked/odd tool markup: 0; median reply chars 383
+sonnet-low (claude-sonnet-5-5, effort low): first word median 2899 ms, p90 3499 ms, max 3499 ms (n=5); thinking block first 4 of 5; errors 0
+   quota: 5 calls; tokens fresh-in 10, cache-write 4310, cache-read 16001, out 1635; API-equivalent cost 0,0361 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 5 of 5; leaked/odd tool markup: 0; median reply chars 338

@@ -1,0 +1,22 @@
+{
+  "1": {
+    "A": "sonnet-default",
+    "B": "sonnet-low"
+  },
+  "2": {
+    "A": "sonnet-low",
+    "B": "sonnet-default"
+  },
+  "3": {
+    "A": "sonnet-default",
+    "B": "sonnet-low"
+  },
+  "4": {
+    "A": "sonnet-low",
+    "B": "sonnet-default"
+  },
+  "5": {
+    "A": "sonnet-low",
+    "B": "sonnet-default"
+  }
+}
