@@ -22,6 +22,9 @@ param(
     [int]$MeasureSeconds = 60,
     [switch]$NoBuild,
     [string]$Pinned = "",
+    [switch]$Baseline,
+    [string]$ExePath = "",
+    [string]$Label = "app",
     [switch]$Chat,
     [switch]$ChatOnly,
     [int]$ChatWarm = 10,
@@ -29,39 +32,19 @@ param(
     [int]$TypingMs = 3000
 )
 if ($ChatOnly) { $Chat = $true; $Runs = 0 }
+. (Join-Path $PSScriptRoot 'perflib.ps1')   # Get-Median, Get-TreePrivateBytes, baseline helpers
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $proj = Join-Path $repo 'src\Companion\Companion.csproj'
-$exe  = Join-Path $repo 'src\Companion\bin\Release\net10.0-windows\Companion.exe'
+$exe  = if ($ExePath) { $ExePath } else { Join-Path $repo 'src\Companion\bin\Release\net10.0-windows\Companion.exe' }
 $outDir = Join-Path $repo 'perf-results'
 
-# D-052 thresholds (idle CPU <2 %, median of 3)
+# D-052 thresholds. Idle CPU <2 % is a reported target, not a gate (D-079); regressions are judged by tools/perfhistory.ps1.
 $maxPrivateMB = 150; $maxTreeMB = 300; $maxCpuPct = 2.0; $maxStartMs = 1000
 $maxFirstWordMs = 2000   # architecture: first word ~2 s (D-052), judged on the real flow with pre-warm
 
-function Get-Median([double[]]$v) {
-    $s = $v | Sort-Object
-    $n = $s.Count
-    if ($n % 2) { return $s[[int](($n - 1) / 2)] }
-    return ($s[$n / 2 - 1] + $s[$n / 2]) / 2
-}
-
-function Get-TreePrivateBytes([int]$rootPid) {
-    $all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId
-    $ids = [System.Collections.Generic.List[int]]::new(); $ids.Add($rootPid)
-    for ($i = 0; $i -lt $ids.Count; $i++) {
-        foreach ($c in $all | Where-Object { $_.ParentProcessId -eq $ids[$i] }) { $ids.Add([int]$c.ProcessId) }
-    }
-    $sum = 0
-    foreach ($id in $ids) {
-        $p = Get-Process -Id $id -ErrorAction SilentlyContinue
-        if ($p) { $sum += $p.PrivateMemorySize64 }
-    }
-    return $sum
-}
-
-if (-not $NoBuild) {
+if (-not $NoBuild -and -not $ExePath) {
     Write-Host "Building Release..."
     dotnet build $proj -c Release -nologo -v q | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Build failed" }
@@ -73,7 +56,8 @@ Get-Process Companion -ErrorAction SilentlyContinue | Stop-Process -Force
 New-Item -ItemType Directory -Force $outDir | Out-Null
 
 $results = @()
-for ($run = 1; $run -le $Runs; $run++) {
+$legacyRuns = if ($Baseline) { 0 } else { $Runs }
+for ($run = 1; $run -le $legacyRuns; $run++) {
     $perfFile = Join-Path $env:TEMP "companion-perf-$PID-$run.txt"
     Remove-Item $perfFile -ErrorAction SilentlyContinue
     $env:COMPANION_PERF_FILE = $perfFile
@@ -111,13 +95,43 @@ for ($run = 1; $run -le $Runs; $run++) {
 }
 Remove-Item Env:COMPANION_PERF_FILE, Env:COMPANION_FPS, Env:COMPANION_RENDER, Env:COMPANION_PERF_PINNED -ErrorAction SilentlyContinue
 
+# D-079: the 2 % idle CPU figure is a reported target, not a gate. Prints the same line, returns nothing for the pass/fail list.
+function Target($name, $value, $fmt, $limit, $unit) {
+    Write-Host ("{0,-28} {1,10} {2}   target < {3} {2}   {4}   (reported, not a gate, D-079; compare builds with tools/perfhistory.ps1)" -f $name, ($fmt -f $value), $unit, $limit, $(if ($value -lt $limit) { 'under' } else { 'over' }))
+}
+
 function Row($name, $value, $fmt, $limit, $unit) {
     $ok = $value -lt $limit
     Write-Host ("{0,-28} {1,10} {2}   limit < {3} {2}   {4}" -f $name, ($fmt -f $value), $unit, $limit, $(if ($ok) { 'PASS' } else { 'FAIL' }))
     return $ok
 }
 
-if ($Runs -gt 0) {
+$ok = @()
+
+# ---------------- Idle CPU with baselines (cpu-investigation) ----------------
+if ($Baseline -and $Runs -gt 0) {
+    $state = Get-MachineState
+    Write-Host ""
+    Write-Host "Machine: $($state.Cpu); $($state.Os)"
+    Write-Host "Power plan: $($state.PowerPlan); $($state.Power)"
+    $variants = @(Get-BaselineVariants $repo) + [pscustomobject]@{ Name = $Label; Exe = $exe; Args = @(); Kind = 'app' }
+    Write-Host ("Idle CPU: {0} rounds x {1} variants, {2} s settle + {3} s measured each, rotated, {4} fps" -f $Runs, $variants.Count, $WarmupSeconds, $MeasureSeconds, $Fps)
+    $rows = Invoke-IdleRotation $variants $Runs $WarmupSeconds $MeasureSeconds $Fps
+    $sum = Write-IdleReport $rows $variants
+    Write-Host ""
+    Format-IdleTable $sum
+    $app = $sum | Where-Object { $_.Variant -eq $Label }
+    Write-Host ""
+    Write-Host ("Median of $Runs runs (D-052 as written: raw): {0:F2}% raw; above the bare window {1:F2}; above the static orb {2:F2}" -f $app.MedianRaw, $app.MedianMinusBare, $app.MedianMinusStatic)
+    Target 'Idle CPU, raw' $app.MedianRaw '{0:F3}' $maxCpuPct '%'
+    $ok += (Row 'App private bytes' $app.PrivateMB '{0:F1}' $maxPrivateMB 'MB')
+    $ok += (Row 'Start to orb' $app.StartMs '{0:F0}' $maxStartMs 'ms')
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    [pscustomobject]@{ version = 1; machine = $state; fps = $Fps; warmup = $WarmupSeconds; measure = $MeasureSeconds; rows = $rows; summary = $sum } |
+        ConvertTo-Json -Depth 5 | Set-Content (Join-Path $outDir "perf-baseline-$stamp.json") -Encoding utf8
+}
+
+if ($legacyRuns -gt 0) {
 $med = [pscustomobject]@{
     StartMs   = Get-Median ($results.StartMs)
     CpuPct    = Get-Median ($results.CpuPct)
@@ -130,14 +144,14 @@ Write-Host ("Median of $Runs runs at $Fps fps, $Render render (D-052)" + $(if ($
 $ok = @(
     (Row 'App private bytes'          $med.PrivateMB '{0:F1}' $maxPrivateMB 'MB'),
     (Row 'Whole tree (incl. claude)'  $med.TreeMB    '{0:F1}' $maxTreeMB    'MB'),
-    (Row 'Idle CPU (one core)'        $med.CpuPct    '{0:F3}' $maxCpuPct    '%'),
     (Row 'Start to orb'               $med.StartMs   '{0:F0}' $maxStartMs   'ms')
 )
+Target 'Idle CPU (one core)' $med.CpuPct '{0:F3}' $maxCpuPct '%'
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 [pscustomobject]@{ version = 1; fps = $Fps; render = $Render; runs = $results; median = $med } |
     ConvertTo-Json -Depth 4 | Set-Content (Join-Path $outDir "perf-$stamp-${Fps}fps-$Render.json") -Encoding utf8
-} else { $ok = @() }
+}
 
 # ---------------- Chat run (step 2) ----------------
 function Get-Pct([double[]]$v, [double]$p) {

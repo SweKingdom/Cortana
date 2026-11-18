@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- CPU baseline for tools/perfcheck.ps1 (cpu-investigation). Not part of the app or the solution.
+       Same window setup as Companion's CharacterWindow; links the real orb drawing so "static" draws the same pixels. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>PerfBaseline</AssemblyName>
+    <RootNamespace>PerfBaseline</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>..\..\src\Companion\app.manifest</ApplicationManifest>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\src\Companion\Character\OrbVisual.cs" Link="Linked\OrbVisual.cs" />
+    <Compile Include="..\..\src\Companion\Character\OrbTuning.cs" Link="Linked\OrbTuning.cs" />
+    <Compile Include="..\..\src\Companion\Character\IAnimator.cs" Link="Linked\IAnimator.cs" />
+    <Compile Include="..\..\src\Companion\Core\Mood.cs" Link="Linked\Mood.cs" />
+  </ItemGroup>
+
+</Project>
