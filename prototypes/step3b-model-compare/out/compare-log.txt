@@ -1,0 +1,42 @@
+[1/10 greeting] haiku-low: first word 514 ms, block text, resolved claude-haiku-5-5, err 
+[1/10 greeting] sonnet: first word 835 ms, block text, resolved claude-sonnet-5-5, err 
+[1/10 greeting] haiku-default: first word 499 ms, block text, resolved claude-haiku-5-5, err 
+[2/10 bug] sonnet: first word 548 ms, block text, resolved claude-sonnet-5-5, err 
+[2/10 bug] haiku-default: first word 653 ms, block text, resolved claude-haiku-5-5, err 
+[2/10 bug] haiku-low: first word 566 ms, block text, resolved claude-haiku-5-5, err 
+[3/10 win] haiku-default: first word 583 ms, block text, resolved claude-haiku-5-5, err 
+[3/10 win] sonnet: first word 561 ms, block text, resolved claude-sonnet-5-5, err 
+[3/10 win] haiku-low: first word 513 ms, block text, resolved claude-haiku-5-5, err 
+[4/10 loss] sonnet: first word 1522 ms, block thinking, resolved claude-sonnet-5-5, err 
+[4/10 loss] haiku-default: first word 507 ms, block text, resolved claude-haiku-5-5, err 
+[4/10 loss] haiku-low: first word 534 ms, block text, resolved claude-haiku-5-5, err 
+[5/10 rough day] haiku-default: first word 680 ms, block text, resolved claude-haiku-5-5, err 
+[5/10 rough day] haiku-low: first word 533 ms, block text, resolved claude-haiku-5-5, err 
+[5/10 rough day] sonnet: first word 845 ms, block text, resolved claude-sonnet-5-5, err 
+[6/10 other AI] haiku-default: first word 2584 ms, block thinking, resolved claude-haiku-5-5, err 
+[6/10 other AI] haiku-low: first word 605 ms, block text, resolved claude-haiku-5-5, err 
+[6/10 other AI] sonnet: first word 1019 ms, block thinking, resolved claude-sonnet-5-5, err 
+[7/10 late night] haiku-default: first word 585 ms, block text, resolved claude-haiku-5-5, err 
+[7/10 late night] sonnet: first word 1068 ms, block text, resolved claude-sonnet-5-5, err 
+[7/10 late night] haiku-low: first word 538 ms, block text, resolved claude-haiku-5-5, err 
+[8/10 remember] sonnet: first word 1059 ms, block thinking, resolved claude-sonnet-5-5, err 
+[8/10 remember] haiku-low: first word 1529 ms, block thinking, resolved claude-haiku-5-5, err 
+[8/10 remember] haiku-default: first word 1892 ms, block thinking, resolved claude-haiku-5-5, err 
+[9/10 swedish] sonnet: first word 1141 ms, block thinking, resolved claude-sonnet-5-5, err 
+[9/10 swedish] haiku-low: first word 514 ms, block text, resolved claude-haiku-5-5, err 
+[9/10 swedish] haiku-default: first word 518 ms, block text, resolved claude-haiku-5-5, err 
+[10/10 explain (code)] haiku-low: first word 576 ms, block text, resolved claude-haiku-5-5, err 
+[10/10 explain (code)] sonnet: first word 2129 ms, block thinking, resolved claude-sonnet-5-5, err 
+[10/10 explain (code)] haiku-default: first word 1842 ms, block thinking, resolved claude-haiku-5-5, err 
+
+Per setup (the numbers do not say which letter is which):
+haiku-low (claude-haiku-5-5, effort low): first word median 534 ms, p90 605 ms, max 1529 ms (n=10); thinking block first 1 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 7882, cache-read 26186, out 1235; API-equivalent cost 0,0029 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 195
+haiku-default (claude-haiku-5-5, effort default): first word median 585 ms, p90 1892 ms, max 2584 ms (n=10); thinking block first 3 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 8737, cache-read 25314, out 1667; API-equivalent cost 0,0033 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 195
+sonnet (claude-sonnet-5-5, effort default): first word median 1019 ms, p90 1522 ms, max 2129 ms (n=10); thinking block first 5 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 12526, cache-read 21339, out 1383; API-equivalent cost 0,0681 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 222
+

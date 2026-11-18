@@ -6,18 +6,24 @@ namespace Companion.Brain;
 
 /// <summary>
 /// Builds what the model sees (architecture, "Minne"): the system prompt = personality file with the chosen flirt
-/// level, boundaries, examples and the memory tool, then facts, impressions and the summary; plus a time line, the
-/// last 20 messages and the new one. The personality is re-sent verbatim on every call and never trimmed (D-026).
-/// The whole prompt is kept under about 3 000 tokens (chars / 4, D-042): oldest verbatim messages go first, then
-/// long messages are shortened. The system prompt is constant until the personality, the flirt level or the memory
-/// changes, so a pre-warmed process (spawned when the input opens) can be reused.
+/// level, boundaries, examples (filtered by that level) and the memory tool, then facts, impressions and the summary;
+/// plus a time line, the last 20 messages, the personality's post-history reminder and the new message. The
+/// personality is re-sent verbatim on every call and never trimmed (D-026).
+/// Only the history is budgeted (D-075, chars / 4): oldest verbatim messages go first, then long messages are
+/// shortened, but at least <see cref="MinHistory"/> messages always stay. The personality, memory, time line,
+/// post-history reminder and the new message are never trimmed. The system prompt is constant until the
+/// personality, the flirt level or the memory changes, so a pre-warmed process (spawned when the input opens) can
+/// be reused.
 /// </summary>
 internal sealed class PromptBuilder
 {
     public const string UserName = "Philip";
     public const string AssistantName = "Cortana";
-    public const int TokenBudget = 3000;
-    /// <summary>A single message is cut to this many characters when the prompt is still over budget.</summary>
+    /// <summary>Tokens (chars / 4) the replayed history may use (D-075).</summary>
+    public const int HistoryBudget = 1500;
+    /// <summary>The newest history messages that are never dropped, whatever the budget (a long one may still be shortened).</summary>
+    public const int MinHistory = 8;
+    /// <summary>A single history message is cut to this many characters when the history is still over budget.</summary>
     public const int ShortenTo = 600;
 
     private readonly PersonalitySource _personality;
@@ -52,19 +58,34 @@ internal sealed class PromptBuilder
         var sb = new StringBuilder();
         sb.Append(p.Identity).Append("\n\n");
         sb.Append(p.Language).Append("\n\n");
-        sb.Append("Tone: ").Append(p.Tone).Append('\n');
+
+        // Version 2 fields (D-074). A version 1 file has none of them and gets its Tone line instead.
+        if (!string.IsNullOrWhiteSpace(p.Backstory)) sb.Append("Backstory: ").Append(p.Backstory).Append("\n\n");
+        if (!string.IsNullOrWhiteSpace(p.Relationship)) sb.Append("Relationship: ").Append(p.Relationship).Append("\n\n");
+        AppendList(sb, "Who you are:", p.Traits);
+        if (p.Interests is { } it && (!string.IsNullOrWhiteSpace(it.Hers) || !string.IsNullOrWhiteSpace(it.His)))
+        {
+            sb.Append("Interests:\n");
+            if (!string.IsNullOrWhiteSpace(it.Hers)) sb.Append("- Yours: ").Append(it.Hers).Append('\n');
+            if (!string.IsNullOrWhiteSpace(it.His)) sb.Append("- His: ").Append(it.His).Append('\n');
+            sb.Append('\n');
+        }
+        AppendList(sb, "How you talk:", p.Speech);
+        if (!string.IsNullOrWhiteSpace(p.Tone)) sb.Append("Tone: ").Append(p.Tone).Append('\n');
         sb.Append("Reply length: ").Append(p.ReplyLength).Append("\n\n");
+        if (!string.IsNullOrWhiteSpace(p.Nagging)) sb.Append("Nudges: ").Append(p.Nagging).Append("\n\n");
 
         sb.Append("Flirting (level ").Append(level).Append(" of 4):\n");
         foreach (var l in p.FlirtLines(level)) sb.Append("- ").Append(l).Append('\n');
         sb.Append("\nBoundaries:\n");
         foreach (var b in p.Boundaries!) sb.Append("- ").Append(b).Append('\n');
+        if (!string.IsNullOrWhiteSpace(p.Never)) sb.Append("\nNever: ").Append(p.Never).Append('\n');
         sb.Append("\nNicknames: ").Append(p.Nicknames).Append("\n\n");
 
         sb.Append(MemoryTool).Append("\n\n");
 
         sb.Append("Examples of how you talk:\n");
-        foreach (var e in p.Examples!) sb.Append(p.User).Append(": ").Append(e.User).Append('\n').Append(p.Name).Append(": ").Append(e.Cortana).Append("\n\n");
+        foreach (var e in p.ExamplesFor(level)) sb.Append(p.User).Append(": ").Append(e.User).Append('\n').Append(p.Name).Append(": ").Append(e.Cortana).Append("\n\n");
 
         var facts = _memory?.ForPrompt(MemoryStore.FactsFile) ?? "";
         var impressions = _memory?.ForPrompt(MemoryStore.ImpressionsFile) ?? "";
@@ -79,6 +100,14 @@ internal sealed class PromptBuilder
         return sb.ToString();
     }
 
+    private static void AppendList(StringBuilder sb, string heading, string[]? lines)
+    {
+        if (lines is not { Length: > 0 }) return;
+        sb.Append(heading).Append('\n');
+        foreach (var l in lines) sb.Append("- ").Append(l).Append('\n');
+        sb.Append('\n');
+    }
+
     /// <summary>Changes every minute, so it goes in the message and not in the system prompt.</summary>
     public static string ContextLine(DateTime now) =>
         $"Now: {now.ToString("dddd yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)} (local time).";
@@ -87,20 +116,21 @@ internal sealed class PromptBuilder
     {
         var system = BuildSystem();
         var context = ContextLine(now);
+        var post = _personality.Current.PostHistory;
         var hist = history.TakeLast(Transcript.MaxHistory).ToList();
 
-        int Total() => EstimateTokens(system) + EstimateTokens(context) + hist.Sum(m => EstimateTokens(m.Text)) + EstimateTokens(userText);
+        int HistTokens() => hist.Sum(m => EstimateTokens(m.Text));
 
-        // 1. Oldest verbatim messages go first, but the most recent turn (2 messages) stays.
-        while (Total() > TokenBudget && hist.Count > 2) hist.RemoveAt(0);
-        // 2. Then long messages are shortened, history first, Philip's new message last.
-        for (int i = 0; i < hist.Count && Total() > TokenBudget; i++)
+        // 1. Oldest verbatim messages go first, but the newest MinHistory messages (and at least the last turn) stay.
+        while (HistTokens() > HistoryBudget && hist.Count > Math.Max(MinHistory, 2)) hist.RemoveAt(0);
+        // 2. Then long messages are shortened, oldest first. None are dropped here, so the minimum holds.
+        for (int i = 0; i < hist.Count && HistTokens() > HistoryBudget; i++)
             if (hist[i].Text.Length > ShortenTo) hist[i] = hist[i] with { Text = Shorten(hist[i].Text) };
-        if (Total() > TokenBudget && userText.Length > ShortenTo * 3) userText = userText[..(ShortenTo * 3)] + " [shortened]";
-        if (Total() > TokenBudget) Log.Event("prompt_over_budget", ("tokens", Total()));
+        if (HistTokens() > HistoryBudget) Log.Event("history_over_budget", ("tokens", HistTokens()), ("messages", hist.Count));
 
         var list = new List<ChatMessage> { new(Role.System, system), new(Role.Context, context) };
         list.AddRange(hist);
+        if (!string.IsNullOrWhiteSpace(post)) list.Add(new ChatMessage(Role.PostHistory, post));
         list.Add(new ChatMessage(Role.User, userText));
         return list;
     }

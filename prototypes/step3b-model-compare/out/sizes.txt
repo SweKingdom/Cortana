@@ -1,0 +1,8 @@
+level | v1 system tokens | v2 system tokens | v2 examples sent
+    0 |              606 |             1387 | 13
+    1 |              611 |             1422 | 14
+    2 |              611 |             1422 | 14
+    3 |              617 |             1464 | 15
+    4 |              760 |             1618 | 16
+memory tool text: 173 tokens (included above)
+memory files at their caps: facts 800 + impressions 800 tokens; summary up to ~160 tokens (not included above)

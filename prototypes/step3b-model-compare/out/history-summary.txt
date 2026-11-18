@@ -1,0 +1,4 @@
+no history: first word median 546 ms, p90 737 ms, max 737 ms (n=6); total input tokens (fresh + cache) median 3400
+8 messages, ~160 chars: first word median 671 ms, p90 1511 ms, max 1511 ms (n=6); total input tokens (fresh + cache) median 4300
+20 messages, ~160 chars: first word median 532 ms, p90 1274 ms, max 1274 ms (n=6); total input tokens (fresh + cache) median 5639
+20 messages, ~600 chars: first word median 1137 ms, p90 2053 ms, max 2053 ms (n=6); total input tokens (fresh + cache) median 11508

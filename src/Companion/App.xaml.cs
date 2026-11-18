@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Companion.Brain;
 using Companion.Character;
 using Companion.Core;
 using Companion.Native;
@@ -66,6 +67,8 @@ public partial class App : Application
         // Chat (step 2): nothing starts here; the session and the windows are created on first use.
         _bus = new EventBus();
         _chat = new ChatController(_window, _bus, _settings, ephemeral: PerfProbe.Enabled);
+        // The daily Sonnet count in the tray tooltip (D-076) until the settings counter of step 4. The quota is recorded before ReplyDone is published.
+        _bus.Subscribe<ReplyDone>(_ => { if (_tray != null) _tray.ToolTipText = TooltipText(_chat!.Session.Quota.CountToday(ClaudeCodeBrain.ChatModel)); });
 
         _hotkeys = new GlobalHotkey();
         // D-030: panic hotkey, suggested Ctrl+Alt+H (hard-coded until step 4 settings).
@@ -109,7 +112,7 @@ public partial class App : Application
 
         _tray = new TaskbarIcon
         {
-            ToolTipText = "Companion",
+            ToolTipText = TooltipText(PerfProbe.Enabled ? 0 : new Quota(AppPaths.QuotaFile).CountToday(ClaudeCodeBrain.ChatModel)),
             ContextMenu = menu,
             IconSource = new GeneratedIconSource
             {
@@ -122,6 +125,8 @@ public partial class App : Application
         };
         _tray.ForceCreate(enablesEfficiencyMode: false);
     }
+
+    private static string TooltipText(int sonnetToday) => $"Companion: {sonnetToday} Sonnet message{(sonnetToday == 1 ? "" : "s")} today";
 
     /// <summary>Flirt level 0-4 (D-017). Applies from the next message; the settings slider comes in step 4.</summary>
     private MenuItem CreateFlirtMenu()

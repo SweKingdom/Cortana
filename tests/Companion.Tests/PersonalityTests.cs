@@ -17,18 +17,22 @@ public class PersonalityTests
     }
 
     [Fact]
-    public void DefaultHasEverythingTheDraftHad()
+    public void DefaultIsVersion2WithEveryField()
     {
         var p = Personality.Default;
-        Assert.Equal(1, p.Version);
+        Assert.Equal(2, p.Version);
         Assert.Equal("Cortana", p.Name);
         Assert.Equal("Philip", p.User);
         for (int level = 0; level <= 4; level++) Assert.NotEmpty(p.FlirtLines(level));
-        Assert.Equal(5, p.FlirtLines(4).Count);                 // level 4 is the five-line list of the draft
+        Assert.Equal(5, p.FlirtLines(4).Count);
         Assert.Contains(p.Boundaries!, b => b.Contains("Jealousy is always a joke"));
-        Assert.Equal(4, p.Examples!.Length);
+        Assert.Equal(19, p.Examples!.Length);
         Assert.Contains("[idle] [happy] [teasing] [flirty] [concerned]", p.Moods);
-        Assert.Equal(8, p.Fillers!.Length);                      // the temporary list from step 2, moved here
+        Assert.Equal(8, p.Fillers!.Length);
+        Assert.NotEmpty(p.Backstory!); Assert.NotEmpty(p.Relationship!); Assert.NotEmpty(p.Traits!);
+        Assert.NotEmpty(p.Interests!.Hers!); Assert.NotEmpty(p.Interests.His!); Assert.NotEmpty(p.Speech!);
+        Assert.NotEmpty(p.Nagging!); Assert.NotEmpty(p.Never!); Assert.NotEmpty(p.PostHistory!);
+        Assert.Null(p.Tone);   // version 2 has no tone field
     }
 
     [Fact]
@@ -59,9 +63,12 @@ public class PersonalityTests
     [Fact]
     public void MissingFieldsFallBackToTheDefaultFieldByField()
     {
-        var p = Personality.Parse("""{ "version": 1, "identity": "You are Test." }""");
+        var p = Personality.Parse("""{ "version": 2, "identity": "You are Test." }""");
         Assert.Equal("You are Test.", p.Identity);
-        Assert.Equal(Personality.Default.Tone, p.Tone);
+        Assert.Equal(Personality.Default.Backstory, p.Backstory);
+        Assert.Equal(Personality.Default.Traits, p.Traits);
+        Assert.Equal(Personality.Default.Interests!.His, p.Interests!.His);
+        Assert.Equal(Personality.Default.PostHistory, p.PostHistory);
         Assert.Equal(8, p.Fillers!.Length);
         Assert.NotEmpty(p.FlirtLines(3));
     }
@@ -133,8 +140,9 @@ public class PromptBuilderTests
             Assert.Contains("Jealousy is always a joke", s);
             Assert.Contains("After midnight, nudge him toward sleep", s);
             Assert.Contains("Philip: morning", s);
-            Assert.Contains("Cortana: Cute. A little needy.", s);
-            Assert.EndsWith("[idle] [happy] [teasing] [flirty] [concerned].", s);
+            Assert.Contains("Cortana: Morning. Up before noon?", s);
+            Assert.EndsWith(Personality.Default.Moods!, s);
+            Assert.Contains("[idle] [happy] [teasing] [flirty] [concerned]", s);
         }
     }
 
@@ -143,7 +151,7 @@ public class PromptBuilderTests
     {
         var s = Make(4).BuildSystem();
         Assert.DoesNotContain("Give me a sec, hotshot.", s);
-        Assert.DoesNotContain("Hang on, partner.", s);
+        Assert.DoesNotContain("Processing. Try to look patient.", s);
     }
 
     [Fact]
@@ -181,13 +189,15 @@ public class PromptBuilderTests
     {
         var hist = new[] { new ChatMessage(Role.User, "hi"), new ChatMessage(Role.Assistant, "hello [happy]") };
         var m = Make(4).Build(hist, "morning", Now);
-        Assert.Equal(new[] { Role.System, Role.Context, Role.User, Role.Assistant, Role.User }, m.Select(x => x.Role));
+        // The post-history reminder (D-074) sits after the history and just before the new message.
+        Assert.Equal(new[] { Role.System, Role.Context, Role.User, Role.Assistant, Role.PostHistory, Role.User }, m.Select(x => x.Role));
+        Assert.Equal(Personality.Default.PostHistory, m[^2].Text);
         Assert.Contains("Tuesday 2026-11-17 14:32", m[1].Text);
         Assert.Equal("morning", m[^1].Text);
     }
 
     [Fact]
-    public void OverBudgetTheOldestMessagesGoFirstAndTheLastTurnStays()
+    public void OverTheHistoryBudgetTheOldestMessagesGoFirstButEightStay()
     {
         var hist = new List<ChatMessage>();
         for (int i = 0; i < 10; i++)
@@ -196,12 +206,38 @@ public class PromptBuilderTests
             hist.Add(new ChatMessage(Role.Assistant, $"a{i} " + new string('y', 800)));
         }
         var m = Make(4).Build(hist, "now", Now);
-        int total = m.Sum(x => PromptBuilder.EstimateTokens(x.Text));
-        Assert.True(total <= PromptBuilder.TokenBudget, $"{total} tokens");
-        var kept = m.Where(x => x.Role is Role.User or Role.Assistant).Select(x => x.Text).ToList();
-        Assert.StartsWith("a9", kept[^2]);                  // newest turn kept...
+        var kept = m.Where(x => x.Role is Role.User or Role.Assistant).SkipLast(1).Select(x => x.Text).ToList();   // without the new message
+        Assert.True(kept.Count >= PromptBuilder.MinHistory);
+        Assert.True(kept.Count < 20);                            // the oldest went
+        Assert.StartsWith("a9", kept[^1]);                       // newest kept...
         Assert.DoesNotContain(kept, t => t.StartsWith("q0 "));   // ...oldest dropped
-        Assert.Equal(m[0].Text, Make(4).BuildSystem());     // the personality is never trimmed
+        Assert.Equal(m[0].Text, Make(4).BuildSystem());          // the personality is never trimmed
+    }
+
+    [Fact]
+    public void AtLeastEightMessagesStayEvenWhenTheyAreFarOverTheBudget()
+    {
+        var hist = new List<ChatMessage>();
+        for (int i = 0; i < 10; i++)
+        {
+            hist.Add(new ChatMessage(Role.User, $"q{i} " + new string('x', 8000)));
+            hist.Add(new ChatMessage(Role.Assistant, $"a{i} " + new string('y', 8000)));
+        }
+        var m = Make(4).Build(hist, "now", Now);
+        int kept = m.Count(x => x.Role is Role.User or Role.Assistant) - 1;
+        Assert.Equal(PromptBuilder.MinHistory, kept);
+        Assert.Contains(m, x => x.Text.EndsWith("[shortened]"));   // shortened rather than dropped
+    }
+
+    [Fact]
+    public void ShortHistoryIsNeverTrimmedAndTheNewMessageNeverCut()
+    {
+        var hist = new List<ChatMessage>();
+        for (int i = 0; i < 10; i++) { hist.Add(new ChatMessage(Role.User, $"q{i} short")); hist.Add(new ChatMessage(Role.Assistant, $"a{i} short")); }
+        var long_ = new string('z', 9000);
+        var m = Make(4).Build(hist, long_, Now);
+        Assert.Equal(20, m.Count(x => x.Role is Role.User or Role.Assistant) - 1);
+        Assert.Equal(long_, m[^1].Text);
     }
 
     [Fact]
@@ -209,15 +245,14 @@ public class PromptBuilderTests
     {
         var hist = new[] { new ChatMessage(Role.User, new string('x', 20000)), new ChatMessage(Role.Assistant, "ok") };
         var m = Make(4).Build(hist, "next", Now);
-        Assert.True(m.Sum(x => PromptBuilder.EstimateTokens(x.Text)) <= PromptBuilder.TokenBudget);
         Assert.Contains(m, x => x.Text.EndsWith("[shortened]"));
     }
 
     [Fact]
-    public void DefaultSystemPromptIsWellUnderTheBudget()
+    public void DefaultSystemPromptIsInTheExpectedRange()
     {
         int tokens = PromptBuilder.EstimateTokens(Make(4).BuildSystem());
-        Assert.InRange(tokens, 200, 1500);
+        Assert.InRange(tokens, 1400, 2200);   // about 1 650 at level 4 (D-075)
     }
 }
 

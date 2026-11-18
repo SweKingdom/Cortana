@@ -1,0 +1,42 @@
+[1/10 greeting] haiku-low: first word 515 ms, block text, resolved claude-haiku-5-5, err 
+[1/10 greeting] sonnet: first word 752 ms, block text, resolved claude-sonnet-5-5, err 
+[1/10 greeting] haiku-default: first word 602 ms, block text, resolved claude-haiku-5-5, err 
+[2/10 build error] haiku-default: first word 1803 ms, block thinking, resolved claude-haiku-5-5, err 
+[2/10 build error] haiku-low: first word 1455 ms, block thinking, resolved claude-haiku-5-5, err 
+[2/10 build error] sonnet: first word 1542 ms, block thinking, resolved claude-sonnet-5-5, err 
+[3/10 small win] haiku-low: first word 479 ms, block text, resolved claude-haiku-5-5, err 
+[3/10 small win] haiku-default: first word 1159 ms, block thinking, resolved claude-haiku-5-5, err 
+[3/10 small win] sonnet: first word 481 ms, block text, resolved claude-sonnet-5-5, err 
+[4/10 game loss] haiku-default: first word 1316 ms, block thinking, resolved claude-haiku-5-5, err 
+[4/10 game loss] sonnet: first word 1630 ms, block thinking, resolved claude-sonnet-5-5, err 
+[4/10 game loss] haiku-low: first word 462 ms, block text, resolved claude-haiku-5-5, err 
+[5/10 sad moment] haiku-default: first word 2203 ms, block thinking, resolved claude-haiku-5-5, err 
+[5/10 sad moment] haiku-low: first word 1246 ms, block thinking, resolved claude-haiku-5-5, err 
+[5/10 sad moment] sonnet: first word 2886 ms, block thinking, resolved claude-sonnet-5-5, err 
+[6/10 swedish] haiku-default: first word 1224 ms, block thinking, resolved claude-haiku-5-5, err 
+[6/10 swedish] haiku-low: first word 500 ms, block text, resolved claude-haiku-5-5, err 
+[6/10 swedish] sonnet: first word 2566 ms, block thinking, resolved claude-sonnet-5-5, err 
+[7/10 technical] haiku-low: first word 893 ms, block thinking, resolved claude-haiku-5-5, err 
+[7/10 technical] sonnet: first word 826 ms, block text, resolved claude-sonnet-5-5, err 
+[7/10 technical] haiku-default: first word 1329 ms, block thinking, resolved claude-haiku-5-5, err 
+[8/10 about her] haiku-default: first word 2320 ms, block thinking, resolved claude-haiku-5-5, err 
+[8/10 about her] sonnet: first word 2941 ms, block thinking, resolved claude-sonnet-5-5, err 
+[8/10 about her] haiku-low: first word 1085 ms, block thinking, resolved claude-haiku-5-5, err 
+[9/10 bad idea] haiku-default: first word 2678 ms, block thinking, resolved claude-haiku-5-5, err 
+[9/10 bad idea] sonnet: first word 2668 ms, block thinking, resolved claude-sonnet-5-5, err 
+[9/10 bad idea] haiku-low: first word 2168 ms, block thinking, resolved claude-haiku-5-5, err 
+[10/10 late night] sonnet: first word 1915 ms, block thinking, resolved claude-sonnet-5-5, err 
+[10/10 late night] haiku-low: first word 1204 ms, block thinking, resolved claude-haiku-5-5, err 
+[10/10 late night] haiku-default: first word 1902 ms, block thinking, resolved claude-haiku-5-5, err 
+
+Per setup (the numbers do not say which letter is which):
+haiku-low (claude-haiku-5-5, effort low): first word median 893 ms, p90 1455 ms, max 2168 ms (n=10); thinking block first 6 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 10922, cache-read 29118, out 1713; API-equivalent cost 0,0044 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 219
+haiku-default (claude-haiku-5-5, effort default): first word median 1329 ms, p90 2320 ms, max 2678 ms (n=10); thinking block first 9 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 8879, cache-read 31163, out 2940; API-equivalent cost 0,0056 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 272
+sonnet (claude-sonnet-5-5, effort default): first word median 1630 ms, p90 2886 ms, max 2941 ms (n=10); thinking block first 7 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 13320, cache-read 26514, out 2457; API-equivalent cost 0,0827 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 252
+

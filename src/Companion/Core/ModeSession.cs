@@ -11,13 +11,14 @@ namespace Companion.Core;
 internal sealed class ModeSession : IDisposable
 {
     public IBrain Brain { get; }
+    private readonly IBrain? _lightBrain;
     public Conversation Conversation { get; }
     public Quota Quota { get; }
     public MemoryStore Memory { get; }
 
-    private ModeSession(IBrain brain, Conversation conversation, Quota quota, MemoryStore memory)
+    private ModeSession(IBrain brain, IBrain lightBrain, Conversation conversation, Quota quota, MemoryStore memory)
     {
-        Brain = brain; Conversation = conversation; Quota = quota; Memory = memory;
+        Brain = brain; _lightBrain = lightBrain; Conversation = conversation; Quota = quota; Memory = memory;
     }
 
     /// <param name="ephemeral">Keep history, quota and memory in memory only and use the built-in personality (the perfcheck chat probe must not touch the real files).</param>
@@ -29,16 +30,19 @@ internal sealed class ModeSession : IDisposable
         var memory = new MemoryStore(ephemeral ? null : AppPaths.MemoryNormal);
         var personality = new PersonalitySource(ephemeral ? null : AppPaths.PersonalityNormal);
         var prompts = new PromptBuilder(personality, () => settings?.FlirtLevel ?? 4, memory);
-        var brain = new ClaudeCodeBrain();
-        var summarizer = new Summarizer(brain, history, memory, quota);
-        var conversation = new Conversation(bus, brain, history, quota, ClaudeCodeBrain.Model,
+        var chatModel = ClaudeCodeBrain.ChatModelFromEnvironment();
+        var brain = new ClaudeCodeBrain(chatModel, ClaudeCodeBrain.ChatEffortFromEnvironment(chatModel));                           // the chat (Sonnet, D-076)
+        var lightBrain = new ClaudeCodeBrain(ClaudeCodeBrain.LightModel);     // the summary: Haiku at low effort
+        var summarizer = new Summarizer(lightBrain, history, memory, quota);
+        var conversation = new Conversation(bus, brain, history, quota, chatModel,
             prompts: prompts, memory: memory, summarizer: summarizer);
-        return new ModeSession(brain, conversation, quota, memory);
+        return new ModeSession(brain, lightBrain, conversation, quota, memory);
     }
 
     public void Dispose()
     {
         Conversation.Interrupt();
         Brain.Dispose();
+        _lightBrain?.Dispose();
     }
 }

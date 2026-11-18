@@ -2,8 +2,11 @@ using Companion.Core;
 
 namespace Companion.Brain;
 
-/// <summary>System = personality/system prompt; Context = a line such as the current time; User and Assistant = the chat.</summary>
-internal enum Role { System, Context, User, Assistant }
+/// <summary>
+/// System = personality/system prompt; Context = a line such as the current time; User and Assistant = the chat;
+/// PostHistory = the personality's reminder, placed after the history and just before the new message (D-074).
+/// </summary>
+internal enum Role { System, Context, User, Assistant, PostHistory }
 
 internal sealed record ChatMessage(Role Role, string Text);
 

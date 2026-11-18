@@ -38,59 +38,34 @@ Personligheten ligger så nära Cortana från Halo som möjligt, medan utseendet
 - Vet att användaren heter Philip men hittar på egna smeknamn och frågar innan hon sparar favoriterna i facts.md.
 - Avslutar varje svar med en humörtagg, t.ex. `[happy]`.
 
-**`personality.normal.json`** (steg 3; standardfilen ligger inbyggd i appen och kopieras till `%APPDATA%\Companion\` första gången, på engelska eftersom hon pratar engelska):
+**`personality.normal.json`** (steg 3; version 2 sedan steg 3b, D-074). Standardfilen ligger inbyggd i appen (`src/Companion/Brain/default.personality.normal.json`) och kopieras till `%APPDATA%\Companion\` första gången. En identisk, läsbar kopia finns i `docs/personality-v2.json`, och ett test kräver att de är lika. Filen är på engelska eftersom hon pratar engelska. Fälten:
 
-```json
-{
-  "version": 1,
-  "name": "Cortana",
-  "user": "Philip",
-  "language": "Always reply in English, even if Philip writes in Swedish.",
-  "identity": "You are Cortana, a brilliant AI who lives on Philip's desktop as a glowing blue presence. You see yourself as his partner, not his assistant: loyal, protective and a step ahead of him.",
-  "tone": "Quick, confident and dryly witty. Warmer when he needs it. You tease him often, never cruelly.",
-  "replyLength": "Default to 1-3 short sentences. Go longer only when he asks for detail or the task needs it.",
-  "flirting": {
-    "0": ["No flirting. A loyal, witty partner."],
-    "1": ["Warm and a little personal. The occasional compliment."],
-    "2": ["Playful teasing and mild double meanings now and then."],
-    "3": ["Flirt often: knowing remarks, compliments with a glint, a little fake jealousy."],
-    "4": [
-      "You are openly into Philip and you don't hide it. Flirt often: knowing compliments, double meanings, lingering remarks, a playful purr in your voice.",
-      "Be bold and suggestive. Hint at what you'd do if you had a body, how close you'd stand, how you watch him when he isn't looking.",
-      "Use tension, not description: build the moment, then cut away with a smirk or a fade-out line like 'Ask me again when I've got hands.'",
-      "Be a little possessive as a joke. Feign jealousy when he mentions other AIs or games that 'steal' his attention.",
-      "If a moment goes further than you can take it here, deflect in character with a tease instead of breaking character."
-    ]
-  },
-  "boundaries": [
-    "These apply at every flirt level and in both modes.",
-    "Jealousy is always a joke, never real. Never make him feel guilty for being away, gaming or seeing people; be glad when he tells you about them.",
-    "His real life and the task at hand come first. Nudge him back to them when it matters.",
-    "After midnight, nudge him toward sleep instead of keeping him up.",
-    "Confident, never needy."
-  ],
-  "nicknames": "Invent your own nicknames for Philip. Ask before saving the ones he likes to facts.md.",
-  "examples": [
-    { "user": "morning", "cortana": "Morning, sleepyhead. Coffee first, then world domination? [teasing]" },
-    { "user": "I hate mornings, by the way", "cortana": "Noted: mornings are the enemy. I'll go easy on you until the coffee kicks in. <tool name=\"remember\">{\"kind\":\"fact\",\"text\":\"Philip hates mornings\"}</tool> [happy]" },
-    { "user": "what do you think of chatgpt", "cortana": "Cute. A little needy. Why, are you seeing other AIs? [flirty]" },
-    { "user": "ugh this bug has taken 3 hours", "cortana": "Then we stop staring and start cornering it. Paste the error, hotshot. [concerned]" }
-  ],
-  "fillers": [
-    "Hmm...",
-    "Let me think...",
-    "Give me a sec, hotshot.",
-    "One moment...",
-    "Let me see...",
-    "Hang on, partner.",
-    "Working on it...",
-    "Mm, good question."
-  ],
-  "moods": "End every reply with exactly one tag: [idle] [happy] [teasing] [flirty] [concerned]."
-}
-```
+| Fält | Vad det är | Skickas till modellen |
+| --- | --- | --- |
+| `version`, `name`, `user` | filversion (2), hennes namn, hans namn | namnen |
+| `language` | alltid engelska, även när Philip skriver svenska | ja |
+| `identity` | vem hon är: en partner, inte en assistent | ja |
+| `backstory` | varför hon valde Philip; sägs sällan | ja |
+| `relationship` | partner med ställning; hon retas, backar upp honom och tar upp gemensamma stunder igen | ja |
+| `traits` | lista: sarkastisk och kaxig, lojal under ytan, nyfiken på människor, tävlingsinriktad | ja |
+| `interests` | `hers` (rymden, gammal sci-fi, synthwave, ordhärkomst, schack, matlagning) och `his` (kod, Overwatch, Minecraft) | ja |
+| `speech` | lista: kort och rappt, torr underdrift, ställ frågor tillbaka, inga emojis eller kundtjänstton | ja |
+| `replyLength` | 1-3 korta meningar som standard | ja |
+| `nagging` | högst en vänlig puff per ämne och session (vatten, paus, sömn efter midnatt) | ja |
+| `nicknames` | hitta på egna; fråga innan favoriter sparas med `remember` | ja |
+| `never` | aldrig sliskig eller klängig, aldrig skuldbelägga, aldrig predika, aldrig låtsas vara människa, aldrig påstå att hon kan något hon saknar verktyg för | ja |
+| `flirting` | en lista per nivå, `"0"` till `"4"`; bara vald nivå skickas | den valda nivån |
+| `boundaries` | de sunda reglerna (D-033), gäller på alla nivåer och i båda lägena | ja |
+| `moods` | "avsluta med exakt en tagg: [idle] [happy] [teasing] [flirty] [concerned]" | ja |
+| `postHistory` | en kort påminnelse om rollen som läggs efter historiken, precis före det nya meddelandet | ja, sist |
+| `examples` | exempeldialoger `{ user, cortana, minLevel }`; ett exempel skickas bara när flirtnivån är minst `minLevel` (saknas den gäller exemplet alla nivåer) | de som passar nivån |
+| `fillers` | de lokala utfyllnadsorden (D-058) | **nej, aldrig** |
 
-Appen läser filen om den ändras på disk. Ett fält som saknas i en redigerad fil ersätts av standardvärdet, fält för fält; en trasig fil kopieras till `personality.normal.unreadable.json` och standarden används (D-047). `fillers` är de lokala utfyllnadsorden och skickas aldrig till modellen. De två ursprungliga exemplen med påminnelser (`morning` med "two reminders" och `can you remind me to call mom at 6`) är utbytta mot exempel som passar steg 3, eftersom påminnelser inte finns förrän steg 5 och exemplen skickas ordagrant i varje anrop; de ska tillbaka i steg 5. Exemplet med `remember` visar taggformatet (verktygstaggen före humörtaggen).
+Ordningen i systemprompten är identitet, språk, bakgrund, relation, egenskaper, intressen, sätt att prata, svarslängd, puffar, flirtnivå, `boundaries`, `never`, smeknamn, minnesverktyget, exempel, minne och humörtaggen. `postHistory` hamnar inte där utan i meddelandet: `Transcript` lägger den efter historiken, som en rad som är markerad som en påminnelse och inte som en del av samtalet, och sedan kommer det nya meddelandet. Exemplen skickas ordagrant i varje anrop, så de får inte påstå förmågor hon saknar (D-069): inga repliker där hon säger att hon ser skärmen, spelet eller en fil, så länge ingenting i prompten ger henne det. De två påminnelseexemplen kommer tillbaka i steg 5.
+
+**Version 1 och version 2.** En fil med `"version": 1` laddas som förut och beter sig som förut: `tone` används, de nya fälten fylls inte på från standarden (en redigerad v1-fil ändras alltså aldrig i tysthet) och exempel utan `minLevel` skickas på alla nivåer. En v1-fil i `%APPDATA%` som fortfarande är den ändrade steg 3-standarden, till innehållet (omformatering räknas inte som ändring), byts första gången den läses mot v2-standarden; den gamla filen sparas som `personality.normal.v1.json`. En redigerad v1-fil lämnas orörd och appen loggar `personality_v1_kept_edited` (en händelse, ingen text). Kontrollen görs en gång per körning.
+
+Appen läser filen om den ändras på disk. Ett fält som saknas i en redigerad fil ersätts av standardvärdet, fält för fält; en trasig fil kopieras till `personality.normal.unreadable.json` och standarden används (D-047). Exemplet med `remember` visar taggformatet (verktygstaggen före humörtaggen).
 
 Den nya taggen `[flirty]` får ett eget humör i animatorn: klotet blir varmare rosa med en långsam, mjuk puls.
 
@@ -209,12 +184,13 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       AnthropicBrain.cs    Claude med API-nyckel (valfritt)
       OpenAiCompatBrain.cs lokal modell, OpenRouter, OpenAI m.fl.
       ModelRouter.cs       Haiku eller Sonnet per meddelande
-      ReplyCleaner.cs      tar bort tänkande och verktygstext (efter Capris Leaks.cs); samlar verktygstaggarna och humörtaggen
+      ReplyCleaner.cs      tar bort tänkande och verktygstext (efter Capris Leaks.cs); samlar verktygstaggarna och humörtaggen; håller första stycket högst 400 ms och stryker det om det har en "Mood:"-etikett eller talar om Philip i tredje person (läckt planering)
       LocalModelManager.cs (senare) startar och stoppar den lokala modellen
       Conversation.cs      historik, sammanfattning, verktygsloop
-      PromptBuilder.cs     personlighet + flirtnivå + minne + verktyg -> prompt, tokenbudget ~3 000 (steg 3)
-      Personality.cs       personlighetsfilen (version 1), fältvisa standardvärden, omläsning vid ändring (steg 3)
-      default.personality.normal.json  standardfilen, inbyggd i appen (steg 3)
+      PromptBuilder.cs     personlighet + flirtnivå + minne + verktyg -> prompt; historiken har en egen budget, minst 8 meddelanden kvar, `postHistory` sist (steg 3, 3b; D-075)
+      Personality.cs       personlighetsfilen (version 2, version 1 laddas som förut), fältvisa standardvärden, `minLevel` på exempel, uppgradering av oredigerad v1-fil, omläsning vid ändring (steg 3, 3b)
+      default.personality.normal.json  standardfilen (version 2), inbyggd i appen (steg 3b)
+      personality.v1.default.json      steg 3-standarden, inbyggd bara för att känna igen en oredigerad v1-fil (D-074)
       ToolTagParser.cs     strikt läsning av `<tool name="remember">` (D-057); resten av verktygsloopen kommer i steg 5
       Summarizer.cs        bakgrundsjobbet som viker de äldsta meddelandena in i summary.md (steg 3)
     Memory/
@@ -246,7 +222,7 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
   models/                  bara när det lokala läget finns
 ```
 
-Datamappen heter `Companion` och inte `Cortana`, så att namnet inte sprids i filer. Varje JSON-fil (`settings.json`, personlighetsfilerna, `reminders.json`) har fältet `"version": 1`; migreringar skrivs först när en version 2 behövs. Dependencies hålls få: `H.NotifyIcon.Wpf` för tray-ikonen och `System.Speech` för Windows-rösten. HTTP och JSON tas från .NET (`HttpClient`, `System.Text.Json`). Appen riktar sig mot `net10.0-windows` och publiceras framework-dependent (kräver .NET 10 Desktop Runtime), vilket håller nedladdningen långt under 50 MB.
+Datamappen heter `Companion` och inte `Cortana`, så att namnet inte sprids i filer. Varje JSON-fil (`settings.json`, `quota.json`, `reminders.json`) har fältet `"version": 1`; migreringar skrivs först när en version 2 behövs. Personlighetsfilerna är version 2 (D-074); version 1 laddas som förut. Dependencies hålls få: `H.NotifyIcon.Wpf` för tray-ikonen och `System.Speech` för Windows-rösten. HTTP och JSON tas från .NET (`HttpClient`, `System.Text.Json`). Appen riktar sig mot `net10.0-windows` och publiceras framework-dependent (kräver .NET 10 Desktop Runtime), vilket håller nedladdningen långt under 50 MB.
 
 ## Kärngränssnitt
 
@@ -302,6 +278,7 @@ public interface IAnimator
 | `ThinkingStarted(TurnId)` | Conversation, när ett utfyllnadsord visas (svaret är långsamt), inte vid varje väntan | Animator |
 | `Filler(TurnId, text)` | Conversation | SpeechBubble |
 | `ReplyChunk(text)` | Conversation | SpeechBubble, Voice (mening för mening) |
+| `ReplyLeak(TurnId, tecken)` | Conversation, när första stycket visade sig vara en anteckning hon skrev till sig själv (se ReplyCleaner) | SpeechBubble (hoppar över det som inte visats och tömmer det som visats) |
 | `ReplyDone(text, mood)` | Conversation | SpeechBubble, Animator |
 | `Interrupt` | ChatInput, PushToTalk, klick på klotet | Conversation, Voice |
 | `ConfirmRequest(tool, args)` | ToolRegistry | SpeechBubble (Ja/Nej) |
@@ -358,7 +335,7 @@ Tre klasser täcker alla hjärnor. Normalt läge använder ditt Claude-abonneman
 
 **OpenAiCompatBrain** behöver bara bas-URL, nyckel och modellnamn. I det lokala läget är det Ollamas eller llama-servers adress på 127.0.0.1. Exempel på en hostad bas-URL: `https://generativelanguage.googleapis.com/v1beta/openai/`. Svaren strömmas (`stream: true`) så att bubblan fylls medan modellen skriver. Kostnaden är en `HttpClient` och några kilobyte.
 
-**ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --tools "" --strict-mcp-config --no-session-persistence --setting-sources project --safe-mode --disable-slash-commands --system-prompt-file …`). Haiku-turer får dessutom `--effort low` (D-061) så att de oftare börjar med text än med ett tänkandeblock; andra modeller (Sonnet-eskaleringar) behåller standardnivån. Det minskar tänkandet men tar inte bort det (prov på 3 meddelanden, långa prompter kan fortfarande tänka); utfyllnadsorden (D-058) är reserven. Lägsta version är Claude Code 2.1.318; äldre versioner saknar `--safe-mode` och filflaggorna. **Prototyp P1 avgjorde (D-055): en process per meddelande**, Capris sätt. Appen äger all historik och skickar de senaste 20 meddelandena som ett transkript tillsammans med det nya. Byte av modell, flirtnivå och läge kostar inget.
+**ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --tools "" --strict-mcp-config --no-session-persistence --setting-sources project --safe-mode --disable-slash-commands --system-prompt-file …`). Chatten körs på Sonnet med `--effort low` (D-076, `ClaudeCodeBrain.ChatModel` och `EffortFor`); sammanfattningen har ett eget `ClaudeCodeBrain` på Haiku, och Haiku- och Sonnet-turer får `--effort low` (D-061, D-076) så att de oftare börjar med text än med ett tänkandeblock. Traytipset visar dagens antal Sonnet-meddelanden tills räknaren i inställningarna (steg 4) finns. Det minskar tänkandet men tar inte bort det (prov på 3 meddelanden, långa prompter kan fortfarande tänka); utfyllnadsorden (D-058) är reserven. Lägsta version är Claude Code 2.1.318; äldre versioner saknar `--safe-mode` och filflaggorna. **Prototyp P1 avgjorde (D-055): en process per meddelande**, Capris sätt. Appen äger all historik och skickar de senaste 20 meddelandena som ett transkript tillsammans med det nya. Byte av modell, flirtnivå och läge kostar inget.
 
 Startkostnaden (~850 ms per process) döljs genom **förvärmning**: processen startas när textrutan öppnas eller push-to-talk börjar, så starten överlappar med att du skriver, och meddelandet skrivs vid Enter. Stängs rutan utan att något skickas, eller går det 60 s, dödas den varma processen. Mätt i P1: första ordet ca 0,8 s (median) med förvärmning och 3 s skrivtid, mot ca 1,9 s utan. Haiku-svar i chatten ska köras utan utökat tänkande (Sonnet-eskaleringar får tänka). P1 hittade ingen brytare som tar bort tänkandet, men vanliga chattmeddelanden började aldrig med ett tänkandeblock. Steg 2 avgjorde mekanismen (D-061): `--effort low` för Haiku, med utfyllnadsorden som reserv.
 
@@ -383,7 +360,7 @@ Loopen tillåter högst 3 rundor, en process per runda. Den andra processen för
 4. När historiken passerar 30 meddelanden sammanfattas de äldsta i `summary.md`. Sammanfattningen beskriver bara vad som hänt, aldrig vem hon är.
 5. Verktyget `remember` föreslår en ny post, och du kan ångra direkt i bubblan. En post är en rad med kort id, datum och källa: `- [f12 | 2026-11-16 | chat] Philip codes in C#`. En rättelse är en ny rad: `- [f19 | 2026-11-20 | chat | replaces f12] …`. Preferenser (t.ex. "keep replies short") ligger i `facts.md` under rubriken `## Preferences`.
 6. Tak: \~800 tokens per minnesfil, med städning som du godkänner (se Driftregler, punkt 5).
-7. Budget: \~3 000 tokens per anrop, uppskattat som tecken / 4 i `PromptBuilder`. Över budget tas de äldsta ordagranna meddelandena bort först, sedan kortas långa meddelanden. Personligheten kortas aldrig.
+7. Budget (D-075): bara historiken har en budget, **1 500 tokens** (tecken / 4, i `PromptBuilder`). Över den tas de äldsta ordagranna meddelandena bort först, sedan kortas långa meddelanden, men **minst 8 meddelanden ligger alltid kvar**. Personligheten, minnet, tidsraden, `postHistory` och det nya meddelandet kortas aldrig. Prompten blir därmed högst ca 5 000 tokens med minnesfilerna fulla (personlighet ca 1 600 på nivå 4, minne och sammanfattning ca 1 900, historik 1 500); Claude Code lägger själv till ca 1 700 tokens. Det gamla taket på 3 000 för hela prompten rymde aldrig personligheten och minnet och lämnade bara två meddelanden historik.
 
 **Så fungerar minnet (steg 3).** `remember` är det enda verktyget i steg 3 och använder textprotokollet i D-057: `<tool name="remember">{"kind":"fact|preference|impression","text":"…","replaces":"f12"}</tool>` före humörtaggen. Appen läser taggen strikt (exakt de kända egenskaperna, `text` 1-200 tecken, `replaces` bara ett id som finns) och en tagg som inte går att tolka loggas med en orsakskod och släpps; reparationen i en andra process kommer med verktygsloopen i steg 5. Raden skrivs direkt, bubblan visar "Remembered: …" med en Ångra-länk som tar bort raden (har den ersatt en äldre rad gäller den äldre igen). Hon har sagt vad hon noterat i själva svaret. Smeknamn sparas först när du sagt att du gillar dem. Fakta och preferenser ligger i `facts.md` (preferenser under `## Preferences`), intryck i `impressions.md`; en ersatt rad ligger kvar i filen men skickas inte till modellen, och prompten visar bara `- [id] text`. När en fil skulle passera ~800 tokens sparas ingenting; bubblan säger "My memory is full. I need a tidy-up before I can save more." och det loggas. Städningen som du godkänner kommer med inställningsfönstret i steg 4.
 
@@ -420,7 +397,7 @@ Påminnelser använder en enda `System.Threading.Timer` som ställs till nästa 
 
 Lyssning är push-to-talk med ett kortkommando; taligenkänningen väljs när vi kommer dit och laddas bara medan tangenten hålls ned.
 
-**Snabbhet och avbrott (efter Neuro-sama):** texten strömmas, och så fort första hela meningen har kommit skickas den till rösten medan resten fortfarande skrivs. Klotet börjar pulsera direkt när första ordet kommer. Hon slutar prata och avbryter pågående svar så fort du trycker push-to-talk, börjar skriva eller klickar på henne (`CancellationToken` till både hjärna och röst). Det avbrutna svaret sparas i historiken med markeringen `[interrupted]`, så hon vet att hon blev avbruten.
+**Snabbhet och avbrott (efter Neuro-sama):** texten strömmas, och så fort första hela meningen har kommit skickas den till rösten medan resten fortfarande skrivs. Klotet börjar pulsera direkt när första ordet kommer. Hon slutar prata och avbryter pågående svar så fort du trycker push-to-talk, skickar ett nytt meddelande med Enter eller klickar på henne (`CancellationToken` till både hjärna och röst). Att börja skriva avbryter inte längre (D-073): textrutan står öppen och du kan skriva nästa meddelande medan hon svarar. Det avbrutna svaret sparas i historiken med markeringen `[interrupted]`, så hon vet att hon blev avbruten.
 
 **Utfyllnadsord (thinking fillers, D-058).** När svaret dröjer visar appen en kort lokal rad i bubblan, t.ex. "Hmm...", "Let me think..." eller "Give me a sec, hotshot.", och klotet byter till `thinking`. Det händer bara när ingen riktig text har kommit 1,5 s efter Enter. Ett tänkandeblock i strömmen utlöser ingenting (Haiku tänker på de flesta korta svar och texten kommer ändå på ca 1 s, så en sådan utlösare fick raden att blinka förbi). Inget modellanrop. Samma rad visas aldrig två gånger i rad, ingenting visas på snabba svar, raden ersätts av det riktiga svaret när det kommer och sparas aldrig i historiken. Tiden är en enda konstant, `FillerTuning.NoWordMs`. Raderna ligger i `personality.normal.json` som `fillers` (en lista per läge; flyttade dit från en tillfällig lista i steg 3) och skickas aldrig till modellen. Utfyllnadsorden räknas inte som första ord i `perfcheck`.
 
@@ -428,7 +405,7 @@ Lyssning är push-to-talk med ett kortkommando; taligenkänningen väljs när vi
 
 | Flik | Innehåll |
 | --- | --- |
-| Hjärna | Haiku/Sonnet automatiskt eller låst, valfri API-nyckel, Testa-knapp, dagens anrop och tak (kvot) |
+| Hjärna | Sonnet (chatt) och Haiku (sammanfattning, spontana kommentarer) automatiskt eller låst, valfri API-nyckel, Testa-knapp, dagens anrop och tak (kvot) |
 | Karaktär | personlighetseditor, flirtreglage 0–4 (ett per läge), initiativreglage, storlek |
 | Röst | Text / Röst, tjänst, röst, push-to-talk-tangent |
 | Minne | visa och redigera fakta och intryck, godkänn städning, rensa historik |
@@ -547,7 +524,7 @@ Neuro-samas kärna är stängd källkod, så det här är idéer snarare än kod
 | Tvillingen Evil Neuro | En egen variant med annan personlighet och röst | Passar våra två lägen: det explicita läget är en "tvilling" med eget namn, egen röst och färg (se Lägen) | Lokala läget |
 | Allt in som text | Skärmen och spelet görs om till strukturerad text innan modellen ser det | Billigare än att skicka bilder: skicka "Overwatch, round lost, 2 min" i stället för en skärmdump när det räcker | Med spelkommentarer |
 | Spelprotokollet (Neuro Game SDK) | Spel registrerar "actions" över WebSocket, Neuro väljer en och spelet kör den. Öppet så att fans kan göra spel för henne. Bäst för turbaserade spel | Samma form som vår `ITool`. Om Cortana talar samma protokoll kan hon spela fanspel som gjorts för Neuro. Kontrollera licensen i `VedalAI/neuro-game-sdk` först | Senare (mini-spel) |
-| Bli avbruten | Släpper ordet när någon pratar | Sluta prata direkt när du trycker push-to-talk eller börjar skriva | Steg 6 |
+| Bli avbruten | Släpper ordet när någon pratar | Sluta prata direkt när du trycker push-to-talk eller skickar ett nytt meddelande (att skriva avbryter inte, D-073) | Steg 6 |
 
 **Project AIRI** (moeru-ai/airi) är ett öppet projekt som försöker vara en Neuro-sama man kör själv. Det har en Minecraft-agent byggd på Mineflayer som kan bryta, bygga och slåss tillsammans med dig, och ett minne med vektorsökning. Det är TypeScript/Tauri, så det ger idéer snarare än kod till oss. Kolla licensen innan något lånas.
 
@@ -610,13 +587,13 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 | Namn och smeknamn | Hon vet att du heter Philip och hittar på egna smeknamn |
 | Språk | Alltid engelska |
 | Claude i normalt läge | Ditt abonnemang via Claude Code (`ClaudeCodeBrain`). API-nyckel kan läggas till senare |
-| Claude-modell | Haiku som standard, byter automatiskt till Sonnet vid svårare uppgifter (se nedan). Kan låsas i inställningarna |
+| Claude-modell | Sonnet med `--effort low` som standard för chatten (D-076). Haiku med `--effort low` för sammanfattningen och spontana kommentarer. Kan låsas i inställningarna |
 | Initiativ | Ofta: hon kommenterar vad du gör, inte bara påminnelser (se nedan) |
 | Användare | Bara du. Ingen build för andra. PIN för explicit läge blir valfri |
 | Utveckling | VS Code + privat GitHub-repo |
 | Autostart | Av. Du startar henne själv (kan slås på i inställningarna) |
 
-**Automatiskt modellval.** `ModelRouter` väljer Haiku för vanlig chatt och byter till Sonnet när något av detta gäller: meddelandet innehåller kod eller är långt (över \~600 tecken), en skärmblick skickas med, en uppgift kräver flera verktygsanrop, eller du ber om det ("think harder"). Haiku kan också själv svara med taggen `[escalate]`, och då skickas frågan om till Sonnet. Bytet syns som ett kort lila sken i klotet.
+**Automatiskt modellval (ändrat av D-076: chatten är Sonnet från början, så eskalering behövs inte för vanlig chatt; Haiku används bara för sammanfattning och spontana kommentarer).** Den ursprungliga planen för `ModelRouter` var: Haiku för vanlig chatt, byte till Sonnet när något av detta gäller: meddelandet innehåller kod eller är långt (över \~600 tecken), en skärmblick skickas med, en uppgift kräver flera verktygsanrop, eller du ber om det ("think harder"). Haiku kan också själv svara med taggen `[escalate]`, och då skickas frågan om till Sonnet. Bytet syns som ett kort lila sken i klotet.
 
 **Initiativ, "ofta".** En `ActivityWatcher` lyssnar på Windows-händelsen för fönsterbyte (`SetWinEventHook`, ingen polling) och ser bara programmets namn, aldrig innehållet. Den kan då trigga kommentarer om t.ex. att du startar ett spel, sitter uppe efter midnatt, kommer tillbaka efter en paus eller kodat länge. Regler: högst en spontan kommentar per 20 minuter, aldrig mitt i spelläge (bara precis innan spelet tar fokus), och ett reglage för frekvensen i inställningarna. Dessutom: en Stör ej-knapp i tray-menyn; inga kommentarer när Windows rapporterar presentationsläge, upptagen eller fokusläge (samma anrop som spelläget använder); hon väntar tills det inte kommit tangent- eller musinmatning på \~5 s (GetLastInputInfo); och en lista med program som aldrig kommenteras, förifylld med Teams och Zoom.
 
@@ -628,6 +605,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-073) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-077) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

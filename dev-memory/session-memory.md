@@ -143,3 +143,33 @@ Rules:
 - Not checked by Claude (by hand): the 10 minute hold and the fade (only the timer logic is tested, with a fake clock), a click outside and a click on the orb hiding the box (the orb click is guarded against reopening for 400 ms), bubble clicks not taking focus (relies on the popup being non-activating), typing while a reply runs, the look of purple particles over each colour. Philip judges.
 - Uncertain: the idle CPU margin under 2% is still within noise; a keystroke while a reply runs skips the pre-warm until that reply ends, so a message sent before it ends starts cold.
 - Design changed: docs/architecture.md (look, input, summary, D-001 to D-073). Philip updates the claude.ai doc to match.
+
+## 2026-11-18 — step 3b, personality v2, model comparison, Sonnet default (Claude, approved by Philip)
+
+- Branch: step-3b-personality (from main e487da3, the merge of PR #4; repo matched the last entry). Pushed with a pull request; Philip merges on GitHub.
+- Added: personality file version 2 and v1 compatibility (`Personality.cs`, embedded `personality.v1.default.json`), `PostHistory` role, history-only budget (`PromptBuilder`), Philip's v2.2 file as default (`docs/personality-v2.json` is the readable copy, a test requires equality), leak guard (`ReplyCleaner`, `ReplyLeak` event, `ChatController.OnReplyLeak`), `ClaudeCodeBrain(model)` with `ChatModel` = sonnet and `LightModel` = haiku (`ModeSession` makes two), daily Sonnet count in the tray tooltip, `prototypes/step3b-model-compare/` with its `out/` (blind files, keys, raw replies; kept in the commit at Philip's request). 201 tests.
+- Decisions: D-074 and D-075 accepted earlier in the session; D-076 (Sonnet default, supersedes D-013) and D-077 (leak guard, 400 ms hold) written as ACCEPTED on Philip's instructions. D-074 wording fixed at his request (it still described the v2 draft examples).
+- Findings: blind picks Sonnet 6 of 10 (v2) and 9 of 10 (v2.1); Haiku low 1 and 1; Haiku default 1 and 0. Sonnet costs about 19 to 23 times Haiku on the API-equivalent figure. **In the real app Sonnet's first word is 3 016 ms median with a thinking block first on 15 of 15 turns, over the ~2 s budget; Haiku low 937 ms.** The blind harness showed Sonnet at 1 630 ms with 7 of 10 thinking, so it understated the app.
+- Mistakes caught by measuring: the tooltip subscription ran before the event bus existed and the app crashed at start (found because perfcheck's app exited; fixed, no test covers `App`); a Python patch through the shell again lost backslashes in C# strings (use files written with the Write tool).
+- Uncertain: the first-word cost of the 400 ms hold (replies without an early "you" now wait up to 400 ms; Haiku run 937 ms against 608 to 1 189 in earlier v2 runs, within the noise); how a retracted leak looks in the bubble; whether `--effort low` on Sonnet fixes the thinking-first rate (untested); the idle numbers were not re-run on the final code.
+- Design changed: docs/architecture.md (personality section, budget, interrupt lines, model choice, ReplyCleaner, `ReplyLeak`, tooltip, D-001 to D-077). Philip updates the claude.ai doc to match.
+- Last confirmed action: Philip's instructions to copy v2.2, add the 400 ms guard, propose D-076 with Sonnet as default and a tooltip count, measure with perfcheck, write the dev-memory entries, commit, push and open the pull request.
+- Next: Sonnet first word (test `--effort low` on Sonnet or change the budget); step 4 (settings, ModelRouter, quota caps); P4 game test (Philip).
+
+### Follow-up on step-3b-personality, same day (Claude, requested by Philip after the PR was opened)
+
+- Asked: try Sonnet with `--effort low`, a small blind check (run 3), confirm idle and start to orb with the guard, and add ModelRouter design notes to step 4 (fast/slow routing with proposed rules, context-aware fillers, a later speculative start).
+- Added: `COMPANION_CHAT_EFFORT` override (`ClaudeCodeBrain(model, effort)`, measuring only; the default is unchanged: Sonnet at default effort), `compare3` mode in the harness, `out/run3/` (blind file and sealed key, key not opened), the design notes in checklist.md step 4.
+- Measured: Sonnet low first word 1 931 ms median (default effort 3 016), thinking first 11 of 15 (15 of 15). Run 3 harness: 3 104 against 2 899 ms median, 4 of 5 thinking first in both, equal cost proxy. Idle median of 3: 2.55% and 1.80% on the branch, 2.21% on `main` in the same session; start to orb 436 to 447 ms; 76.5 MB. Noise, not an effect.
+- Changed by me: D-076 status ACCEPTED to PROPOSED and D-013 back to ACCEPTED, because Philip said D-076 is still to be decided; I had written it as ACCEPTED from his earlier instruction.
+- Uncertain: the idle CPU limit has no margin on this PC (three medians either side of 2%); one run of 10 for Sonnet low.
+- Last confirmed action: Philip's instructions above. Waiting for Philip to judge `out/run3/blind.md`.
+- Next: Philip judges run 3, then decide D-076 and the Sonnet effort; then step 4.
+
+### Run 3 judged and D-076 decided, same day (Claude, instructed by Philip)
+
+- Philip's run 3 picks mapped with the key: Sonnet low 3 (messages 3, 4, 5), Sonnet default 2 (1, 2); nearly a tie. He decided: **D-076 ACCEPTED with Sonnet `--effort low` as the chat default**, Haiku low for the summary and proactive comments. `EffortFor` now gives Sonnet `low` (test updated, 202 tests); D-076 rewritten, D-013 back to SUPERSEDED, architecture.md lines updated.
+- Confirming perfcheck on the final code: first word 2 291 ms median, over the ~2 s limit by 291 ms (the first low run was 1 931 ms); 11 of 15 thinking first. Reported to Philip as a miss at the limit, not a pass.
+- Next-pass note recorded in checklist.md (living in his machine, dry AI self-awareness, pushing back on his motives, never coddling).
+- Uncertain: the first-word budget is met on one run and missed on the other; one run of 15 each.
+- Next: Philip merges PR #5 on GitHub (his call on the 2.3 s first word); step 4 (ModelRouter notes are in the checklist); the personality pass.

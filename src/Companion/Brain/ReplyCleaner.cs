@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Companion.Core;
 
 namespace Companion.Brain;
@@ -7,6 +8,11 @@ namespace Companion.Brain;
 /// Cleans a streamed reply before it reaches the bubble: removes tool tags (D-057), which are never shown, and the
 /// mood tag at the very end (kept in <see cref="Mood"/>). The text of each tool tag is collected in <see cref="ToolTags"/> for the strict parser (D-057). Streaming: text that might still turn into a
 /// tag is held back until it is clear, and trailing whitespace is held until more text follows.
+/// <para>Leaked planning: a model sometimes starts with a note to itself ("Give him a quick, decisive pick. Mood: teasing.").
+/// The first paragraph is therefore held briefly, judged when it ends, and dropped if it carries a "Mood:" label or talks about
+/// Philip in the third person (he, him, his, Philip, with no "you" in it). The hold lasts at most
+/// <see cref="LeadHoldMs"/> and ends at the first "you", so ordinary replies still stream. A paragraph shown after the hold
+/// and judged a leak later is taken back (<see cref="TakeRetract"/>); a reply that is only that one paragraph is kept.</para>
 /// </summary>
 internal sealed class ReplyCleaner
 {
@@ -26,8 +32,97 @@ internal sealed class ReplyCleaner
     /// <summary>True if the reply ended inside a tool tag; the rest was dropped, never shown.</summary>
     public bool UnclosedTag { get; private set; }
 
-    public string Push(string delta) { _undecided.Append(delta); return Drain(final: false); }
-    public string Flush() => Drain(final: true);
+    /// <summary>
+    /// The longest the first paragraph is held back before it is shown anyway, in milliseconds. The caller owns the
+    /// timer and calls <see cref="ReleaseLead"/> when it runs out; this is the one place the number lives.
+    /// </summary>
+    public const int LeadHoldMs = 400;
+
+    private static readonly Regex ParagraphBreak = new(@"\r?\n[ \t]*\r?\n", RegexOptions.Compiled);
+    private static readonly Regex MoodLabel = new(@"\bmood\s*:", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SecondPerson = new(@"\byou(r|rs|rself)?\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ThirdPerson = new(@"\b(he|him|his|philip)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex Vocative = new(@"(^|[,;—-]\s*)Philip\s*(?=[,.!?:;]|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private enum Lead { Holding, Streaming, Done }
+    private Lead _lead = Lead.Holding;
+    private readonly StringBuilder _held = new();   // first-paragraph text not yet handed out (Holding)
+    private readonly StringBuilder _para = new();   // the first paragraph so far, handed out or not (until its end)
+    private int _handedOut;                         // characters of the first paragraph already handed out
+    private int _retract;
+
+    /// <summary>Why the leading paragraph was dropped ("mood_label" or "third_person"), or null. Reason only, never the text.</summary>
+    public string? LeakDropped { get; private set; }
+    /// <summary>Why the leading paragraph looked like a leak but was kept because it was the whole reply, or null.</summary>
+    public string? LeakKept { get; private set; }
+    /// <summary>First-paragraph text is being held back, waiting to be judged or released.</summary>
+    public bool Holding => _lead == Lead.Holding && _held.Length > 0;
+
+    public string Push(string delta) { _undecided.Append(delta); return Gate(Drain(final: false), final: false); }
+    public string Flush() => Gate(Drain(final: true), final: true);
+
+    /// <summary>
+    /// The hold ran out: hands out what is held so far. The paragraph is still judged when it ends; if it turns out to be a
+    /// leak, <see cref="TakeRetract"/> says how much of it had already gone out.
+    /// </summary>
+    public string ReleaseLead()
+    {
+        if (!Holding) return "";
+        var s = _held.ToString();
+        _held.Clear();
+        _lead = Lead.Streaming;
+        _handedOut = s.Length;
+        return s;
+    }
+
+    /// <summary>
+    /// After a <c>Push</c> that judged an already released first paragraph to be a leak: how many characters of text handed
+    /// out earlier belonged to it (the caller takes them back). Zero otherwise; reading it resets it.
+    /// </summary>
+    public int TakeRetract() { var r = _retract; _retract = 0; return r; }
+
+    private static string? LeakReason(string paragraph)
+    {
+        if (MoodLabel.IsMatch(paragraph)) return "mood_label";
+        var p = Vocative.Replace(paragraph, "$1");
+        return ThirdPerson.IsMatch(p) && !SecondPerson.IsMatch(p) ? "third_person" : null;
+    }
+
+    private string Gate(string visible, bool final)
+    {
+        if (_lead == Lead.Done) return visible;
+        if (visible.Length == 0 && !final) return "";
+        _para.Append(visible);
+        var para = _para.ToString();
+        int priorLen = para.Length - visible.Length;   // text of the paragraph from before this piece
+        var m = ParagraphBreak.Match(para);
+        if (m.Success)
+        {
+            // The paragraph ended inside this piece (the break arrives whole: whitespace is held with the text after it).
+            var reason = LeakReason(para[..m.Index]);
+            var held = _held.ToString();
+            _held.Clear();
+            var before = _lead == Lead.Holding ? 0 : _handedOut;   // what already went out
+            _lead = Lead.Done; _para.Clear();
+            if (reason == null) return held + visible;
+            LeakDropped = reason;
+            _retract = before;
+            int cut = Math.Max(m.Index + m.Length - priorLen, 0);   // the part of this piece up to the end of the break is still the leak
+            return visible.Length > cut ? visible[cut..] : "";
+        }
+        if (final)
+        {
+            var held = _held.ToString();
+            _held.Clear();
+            _lead = Lead.Done; _para.Clear();
+            LeakKept = LeakReason(para);
+            return held + visible;
+        }
+        if (_lead == Lead.Streaming) { _handedOut += visible.Length; return visible; }
+        _held.Append(visible);
+        if (SecondPerson.IsMatch(para) && !MoodLabel.IsMatch(para)) return ReleaseLead();   // an ordinary reply: no reason to wait
+        return "";
+    }
 
     private string Drain(bool final)
     {
