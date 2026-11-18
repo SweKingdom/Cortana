@@ -165,3 +165,11 @@ Rules:
 - Uncertain: the idle CPU limit has no margin on this PC (three medians either side of 2%); one run of 10 for Sonnet low.
 - Last confirmed action: Philip's instructions above. Waiting for Philip to judge `out/run3/blind.md`.
 - Next: Philip judges run 3, then decide D-076 and the Sonnet effort; then step 4.
+
+### Run 3 judged and D-076 decided, same day (Claude, instructed by Philip)
+
+- Philip's run 3 picks mapped with the key: Sonnet low 3 (messages 3, 4, 5), Sonnet default 2 (1, 2); nearly a tie. He decided: **D-076 ACCEPTED with Sonnet `--effort low` as the chat default**, Haiku low for the summary and proactive comments. `EffortFor` now gives Sonnet `low` (test updated, 202 tests); D-076 rewritten, D-013 back to SUPERSEDED, architecture.md lines updated.
+- Confirming perfcheck on the final code: first word 2 291 ms median, over the ~2 s limit by 291 ms (the first low run was 1 931 ms); 11 of 15 thinking first. Reported to Philip as a miss at the limit, not a pass.
+- Next-pass note recorded in checklist.md (living in his machine, dry AI self-awareness, pushing back on his motives, never coddling).
+- Uncertain: the first-word budget is met on one run and missed on the other; one run of 15 each.
+- Next: Philip merges PR #5 on GitHub (his call on the 2.3 s first word); step 4 (ModelRouter notes are in the checklist); the personality pass.

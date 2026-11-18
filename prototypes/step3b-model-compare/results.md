@@ -183,4 +183,18 @@ No errors, no leaked tool markup. Both resolved to `claude-sonnet-5-5`. Five cal
 
 ### Run 3: Philip's picks and what they were
 
-Pending: Philip has not judged `out/run3/blind.md` yet.
+| # | Message | Pick | Setup behind the pick | Philip's note |
+| --- | --- | --- | --- | --- |
+| 1 | greeting 09:30 | A | Sonnet default | close |
+| 2 | merge conflict | B | Sonnet default | |
+| 3 | diamond in ranked | B | Sonnet low | |
+| 4 | Rust or C# | A | Sonnet low | |
+| 5 | lonely at 00:40 | A | Sonnet low | |
+
+Tally: Sonnet low 3, Sonnet default 2 (by letter A won 3 to 2 as well). Philip: nearly a tie; B had the most character-specific lines. Decision: Sonnet `--effort low` is the chat default (D-076).
+
+Philip's note for the next personality pass: her most in-character lines are about living in his machine ("I live in there"), dry self-awareness about being an AI, pushing back on his motives, and never coddling; strengthen those in the examples. Copied to the checklist.
+
+## Final check with the default (Sonnet low) as the code default
+
+`perfcheck -ChatOnly` with no override variables, final code: first word real flow 2 291 ms median / 3 322 p90 / 4 666 max, cold 3 325 ms, reply complete 2 891 / 4 001, thinking first 11 of 15, filler 11 of 15, mood tag 15 of 15, app 95.4 MB after chat, tree at rest 95.4 MB, 0 claude at rest. The first Sonnet-low run was 1 931 ms, so one run passes and one misses the 2 s limit by 291 ms.

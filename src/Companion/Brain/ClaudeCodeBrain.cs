@@ -9,7 +9,7 @@ namespace Companion.Brain;
 /// Claude through the user's plan (D-012): one `claude` process per message (D-055). The app owns the history and
 /// sends it as a transcript, so changing model, flirt level or mode costs nothing. Pre-warm: the process is
 /// spawned when the chat input opens and the message is written on Enter; an unused warm process is killed after
-/// 60 s or when the input closes unsent. One brain object per model: chat uses <see cref="ChatModel"/> (Sonnet, D-076),
+/// 60 s or when the input closes unsent. One brain object per model: chat uses <see cref="ChatModel"/> (Sonnet at low effort, D-076),
 /// the summary and later proactive comments use <see cref="LightModel"/> (Haiku, low effort). ModelRouter is step 4.
 /// </summary>
 internal sealed class ClaudeCodeBrain : IBrain
@@ -24,8 +24,9 @@ internal sealed class ClaudeCodeBrain : IBrain
     /// <summary>The model the chat runs on: <see cref="ChatModel"/>, or what COMPANION_CHAT_MODEL says (read once; for perfcheck).</summary>
     public static string ChatModelFromEnvironment()
         => Environment.GetEnvironmentVariable("COMPANION_CHAT_MODEL") is { Length: > 0 } m ? m : ChatModel;
-    /// <summary>Haiku turns run at low effort so they start with text, not a thinking block (D-061). Other models (Sonnet) keep the default effort.</summary>
-    public static string? EffortFor(string model) => model.Contains("haiku", StringComparison.OrdinalIgnoreCase) ? "low" : null;
+    /// <summary>Haiku and Sonnet turns run at low effort so they start with text more often than with a thinking block (D-061, D-076). Other models keep the default effort.</summary>
+    public static string? EffortFor(string model)
+        => model.Contains("haiku", StringComparison.OrdinalIgnoreCase) || model.Contains("sonnet", StringComparison.OrdinalIgnoreCase) ? "low" : null;
     private const int WarmLifetimeMs = 60_000;
     private const int SilenceMs = 60_000;
 

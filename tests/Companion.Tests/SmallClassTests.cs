@@ -10,9 +10,10 @@ public class EffortTests
     [Theory]
     [InlineData("haiku", "low")]
     [InlineData("claude-haiku-4-5", "low")]
-    [InlineData("sonnet", null)]
+    [InlineData("sonnet", "low")]
+    [InlineData("claude-sonnet-5-5", "low")]
     [InlineData("opus", null)]
-    public void OnlyHaikuRunsAtLowEffort(string model, string? expected)
+    public void HaikuAndSonnetRunAtLowEffort(string model, string? expected)
         => Assert.Equal(expected, ClaudeCodeBrain.EffortFor(model));
 }
 
