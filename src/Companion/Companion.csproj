@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Brain\default.personality.normal.json" LogicalName="personality.normal.json" />
+    <!-- The version 1 default shipped in step 3, kept only to recognise an unedited copy and upgrade it (D-074). -->
+    <EmbeddedResource Include="Brain\personality.v1.default.json" LogicalName="personality.v1.default.json" />
   </ItemGroup>
 
   <ItemGroup>

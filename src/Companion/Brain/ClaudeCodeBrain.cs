@@ -9,20 +9,30 @@ namespace Companion.Brain;
 /// Claude through the user's plan (D-012): one `claude` process per message (D-055). The app owns the history and
 /// sends it as a transcript, so changing model, flirt level or mode costs nothing. Pre-warm: the process is
 /// spawned when the chat input opens and the message is written on Enter; an unused warm process is killed after
-/// 60 s or when the input closes unsent. Haiku fixed until ModelRouter (step 4, D-013).
+/// 60 s or when the input closes unsent. One brain object per model: chat uses <see cref="ChatModel"/> (Sonnet, D-076),
+/// the summary and later proactive comments use <see cref="LightModel"/> (Haiku, low effort). ModelRouter is step 4.
 /// </summary>
 internal sealed class ClaudeCodeBrain : IBrain
 {
-    public const string Model = "haiku";
-    /// <summary>Haiku chat turns run at low effort so they start with text, not a thinking block (D-061). Other models (Sonnet escalations) keep the default effort.</summary>
+    /// <summary>The default chat model (D-076). Dev override for measuring: COMPANION_CHAT_MODEL=haiku.</summary>
+    public const string ChatModel = "sonnet";
+    /// <summary>The cheap model for the summary and proactive comments (D-076).</summary>
+    public const string LightModel = "haiku";
+    /// <summary>The model the chat runs on: <see cref="ChatModel"/>, or what COMPANION_CHAT_MODEL says (read once; for perfcheck).</summary>
+    public static string ChatModelFromEnvironment()
+        => Environment.GetEnvironmentVariable("COMPANION_CHAT_MODEL") is { Length: > 0 } m ? m : ChatModel;
+    /// <summary>Haiku turns run at low effort so they start with text, not a thinking block (D-061). Other models (Sonnet) keep the default effort.</summary>
     public static string? EffortFor(string model) => model.Contains("haiku", StringComparison.OrdinalIgnoreCase) ? "low" : null;
     private const int WarmLifetimeMs = 60_000;
     private const int SilenceMs = 60_000;
 
+    private readonly string _model;
     private readonly object _gate = new();
     private ClaudeProcess? _warm;
     private string? _warmPrompt;
     private Timer? _warmTimer;
+
+    public ClaudeCodeBrain(string model = ChatModel) => _model = model;
 
     public string Name => "ClaudeCode";
     public bool SupportsVision => false;
@@ -36,7 +46,7 @@ internal sealed class ClaudeCodeBrain : IBrain
             DropWarm();
             try
             {
-                _warm = ClaudeProcess.Start(Model, WriteSystemFile(systemPrompt), EffortFor(Model));
+                _warm = ClaudeProcess.Start(_model, WriteSystemFile(systemPrompt), EffortFor(_model));
                 _warmPrompt = systemPrompt;
                 _warmTimer = new Timer(_ => CancelPreWarm(), null, WarmLifetimeMs, Timeout.Infinite); // one-shot, not a poll
                 Log.Event("prewarm_start");
@@ -74,7 +84,7 @@ internal sealed class ClaudeCodeBrain : IBrain
             DropWarm();
         }
         wasWarm = false;
-        return ClaudeProcess.Start(Model, WriteSystemFile(systemPrompt), EffortFor(Model));
+        return ClaudeProcess.Start(_model, WriteSystemFile(systemPrompt), EffortFor(_model));
     }
 
     private static string WriteSystemFile(string prompt)

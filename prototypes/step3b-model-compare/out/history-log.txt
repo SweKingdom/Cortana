@@ -1,0 +1,29 @@
+no history #1: first word 604 ms, block text, in 2+1027+2371, err 
+no history #2: first word 719 ms, block text, in 2+1025+2371, err 
+no history #3: first word 737 ms, block text, in 2+1029+2371, err 
+no history #4: first word 546 ms, block text, in 2+1026+2371, err 
+no history #5: first word 519 ms, block text, in 2+1027+2371, err 
+no history #6: first word 506 ms, block text, in 2+1023+2371, err 
+8 messages, ~160 chars #1: first word 1151 ms, block thinking, in 2+1927+2371, err 
+8 messages, ~160 chars #2: first word 523 ms, block text, in 2+1925+2371, err 
+8 messages, ~160 chars #3: first word 1287 ms, block thinking, in 2+1933+2371, err 
+8 messages, ~160 chars #4: first word 1511 ms, block thinking, in 2+1927+2371, err 
+8 messages, ~160 chars #5: first word 563 ms, block text, in 2+1925+2371, err 
+8 messages, ~160 chars #6: first word 671 ms, block text, in 2+1928+2371, err 
+20 messages, ~160 chars #1: first word 1184 ms, block thinking, in 2+3265+2371, err 
+20 messages, ~160 chars #2: first word 1268 ms, block thinking, in 2+3266+2371, err 
+20 messages, ~160 chars #3: first word 513 ms, block text, in 2+3264+2371, err 
+20 messages, ~160 chars #4: first word 1274 ms, block thinking, in 2+3266+2371, err 
+20 messages, ~160 chars #5: first word 522 ms, block text, in 2+3266+2371, err 
+20 messages, ~160 chars #6: first word 532 ms, block text, in 2+3269+2371, err 
+20 messages, ~600 chars #1: first word 1321 ms, block thinking, in 2+9133+2371, err 
+20 messages, ~600 chars #2: first word 1737 ms, block thinking, in 2+9135+2371, err 
+20 messages, ~600 chars #3: first word 794 ms, block text, in 2+9135+2371, err 
+20 messages, ~600 chars #4: first word 1137 ms, block thinking, in 2+9129+2371, err 
+20 messages, ~600 chars #5: first word 2053 ms, block thinking, in 2+9137+2371, err 
+20 messages, ~600 chars #6: first word 739 ms, block text, in 2+9138+2371, err 
+
+no history: first word median 546 ms, p90 737 ms, max 737 ms (n=6); total input tokens (fresh + cache) median 3400
+8 messages, ~160 chars: first word median 671 ms, p90 1511 ms, max 1511 ms (n=6); total input tokens (fresh + cache) median 4300
+20 messages, ~160 chars: first word median 532 ms, p90 1274 ms, max 1274 ms (n=6); total input tokens (fresh + cache) median 5639
+20 messages, ~600 chars: first word median 1137 ms, p90 2053 ms, max 2053 ms (n=6); total input tokens (fresh + cache) median 11508

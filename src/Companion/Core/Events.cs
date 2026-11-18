@@ -12,6 +12,8 @@ internal sealed record ThinkingStarted(int TurnId);
 /// <summary>A local line shown while waiting. Not a reply: never saved to history, no model call.</summary>
 internal sealed record Filler(int TurnId, string Text);
 internal sealed record ReplyChunk(int TurnId, string Text);
+/// <summary>The first <paramref name="Chars"/> characters sent so far for this turn were a leaked note to herself: the bubble drops what it has not shown yet and clears what it has.</summary>
+internal sealed record ReplyLeak(int TurnId, int Chars);
 /// <summary>The reply is complete. Mood is the tag at its end (null when she left it out or the reply was interrupted).</summary>
 internal sealed record ReplyDone(int TurnId, string Text, bool Interrupted, Mood? Mood = null);
 /// <summary>She saved a note (the bubble shows it with an Undo button, D-026).</summary>

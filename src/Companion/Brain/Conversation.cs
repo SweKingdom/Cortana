@@ -163,6 +163,7 @@ internal sealed class Conversation
             ShowFiller();
         }
         bool sawThinking = false;
+        int leakRetracted = 0;
         void Emit(string visible)
         {
             if (visible.Length == 0) return;
@@ -176,6 +177,29 @@ internal sealed class Conversation
             _bus.Publish(new ReplyChunk(turn, visible));
         }
 
+        // Leaked planning (ReplyCleaner): the first paragraph is held at most LeadHoldMs, then shown. If it is judged a leak
+        // after that, the part already shown is taken back (ReplyLeak) and left out of the history. Everything that touches
+        // the cleaner or `shown` goes through `sync`, because the hold timer may run on another thread.
+        var sync = new object();
+        using var holdCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        bool holdStarted = false;
+        void Feed(string visible)
+        {
+            int taken = cleaner.TakeRetract();
+            if (taken > 0)
+            {
+                shown.Remove(0, Math.Min(taken, shown.Length));
+                leakRetracted += taken;
+                _bus.Publish(new ReplyLeak(turn, taken));
+            }
+            Emit(visible);
+        }
+        async Task ReleaseAfterHold()
+        {
+            try { await Task.Delay(ReplyCleaner.LeadHoldMs, holdCts.Token); } catch (OperationCanceledException) { return; }
+            lock (sync) { if (!ct.IsCancellationRequested) Feed(cleaner.ReleaseLead()); }
+        }
+
         try
         {
             _ = ShowFillerAfter(_noWordMs);
@@ -186,12 +210,20 @@ internal sealed class Conversation
                     case ThinkingChunk:   // logged only; a thinking block does not trigger a filler (D-058)
                         if (!sawThinking) { sawThinking = true; Log.Event("thinking_block", ("turn", turn), ("ms", sw.ElapsedMilliseconds)); }
                         break;
-                    case TextChunk t: Emit(cleaner.Push(t.Text)); break;
+                    case TextChunk t:
+                        lock (sync)
+                        {
+                            Feed(cleaner.Push(t.Text));
+                            if (!holdStarted && cleaner.Holding) { holdStarted = true; _ = ReleaseAfterHold(); }
+                        }
+                        break;
                     case DoneChunk d: usage = d.Usage; break;
                 }
             }
-            Emit(cleaner.Flush());
+            lock (sync) Feed(cleaner.Flush());
             if (cleaner.UnclosedTag) Log.Event("cleaner_unclosed_tag", ("turn", turn));
+            if (cleaner.LeakDropped != null) Log.Event("reply_leak_dropped", ("turn", turn), ("why", cleaner.LeakDropped), ("retracted", leakRetracted));
+            if (cleaner.LeakKept != null) Log.Event("reply_leak_kept", ("turn", turn), ("why", cleaner.LeakKept));
         }
         catch (OperationCanceledException) { interrupted = true; }
         catch (BrainException ex) { failed = ex.Kind; Log.Event("turn_failed", ("turn", turn), ("kind", ex.Kind), ("why", ex.Message)); }
@@ -202,6 +234,7 @@ internal sealed class Conversation
         finally
         {
             fillerCts.Cancel();
+            holdCts.Cancel();
             if (ReferenceEquals(_cts, cts)) _cts = null;
             cts.Dispose();
         }

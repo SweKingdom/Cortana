@@ -48,7 +48,7 @@ public class ConversationTests
         {
             Conv = new Conversation(Bus, Brain, History, Quota, "haiku", new Fillers(new[] { "F1", "F2" }, new Random(3)), () => Now, noWordMs);
             Bus.Subscribe<TurnStarted>(Events.Enqueue); Bus.Subscribe<ThinkingStarted>(Events.Enqueue); Bus.Subscribe<Filler>(Events.Enqueue);
-            Bus.Subscribe<ReplyChunk>(Events.Enqueue); Bus.Subscribe<ReplyDone>(Events.Enqueue); Bus.Subscribe<TurnFailed>(Events.Enqueue);
+            Bus.Subscribe<ReplyChunk>(Events.Enqueue); Bus.Subscribe<ReplyLeak>(Events.Enqueue); Bus.Subscribe<ReplyDone>(Events.Enqueue); Bus.Subscribe<TurnFailed>(Events.Enqueue);
         }
         public IEnumerable<T> Of<T>() => Events.OfType<T>();
     }
@@ -106,12 +106,55 @@ public class ConversationTests
     }
 
     [Fact]
+    public async Task TheFirstParagraphIsHeldForAtMostTheHoldTimeThenShown()
+    {
+        var r = new Rig();
+        var shownAt = new TaskCompletionSource<DateTime>();
+        r.Bus.Subscribe<ReplyChunk>(_ => shownAt.TrySetResult(DateTime.UtcNow));
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Plain words, no pronoun. ")), (1500, new TextChunk("More. [idle]")), (0, FakeBrain.Done()));
+        var start = DateTime.UtcNow;
+        await r.Conv.SendAsync("hi");
+        var waited = (await shownAt.Task - start).TotalMilliseconds;
+        Assert.InRange(waited, ReplyCleaner.LeadHoldMs - 50, ReplyCleaner.LeadHoldMs + 600);
+        Assert.Equal("Plain words, no pronoun. More.", r.History.Messages[1].Text);
+    }
+
+    [Fact]
+    public async Task ALeakFoundAfterTheHoldIsTakenBackAndLeftOutOfTheHistory()
+    {
+        var r = new Rig();
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct,
+            (0, new TextChunk("Give him a quick pick. ")), (ReplyCleaner.LeadHoldMs + 300, new TextChunk("Mood: teasing.")),
+            (0, new TextChunk("\n\nTake the red one. [teasing]")), (0, FakeBrain.Done()));
+        await r.Conv.SendAsync("what should I eat");
+        var leak = Assert.Single(r.Of<ReplyLeak>());
+        Assert.Equal("Give him a quick pick. Mood: teasing.".Length, leak.Chars);
+        // the chunks before the leak event are the leak, the one after it is the real reply
+        var order = r.Events.Where(e => e is ReplyChunk or ReplyLeak).ToList();
+        int at = order.IndexOf(leak);
+        Assert.Equal("Take the red one.", ((ReplyChunk)order[at + 1]).Text);
+        Assert.Equal("Take the red one.", r.History.Messages[1].Text);
+        Assert.Equal("Take the red one.", r.Of<ReplyDone>().Single().Text);
+    }
+
+    [Fact]
+    public async Task ALeakJudgedBeforeTheHoldRunsOutNeverReachesTheBubble()
+    {
+        var r = new Rig();
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Give him a quick pick. Mood: teasing.\n\nTake the red one. [teasing]")), (0, FakeBrain.Done()));
+        await r.Conv.SendAsync("what should I eat");
+        Assert.Empty(r.Of<ReplyLeak>());
+        Assert.Equal("Take the red one.", string.Concat(r.Of<ReplyChunk>().Select(c => c.Text)));
+        Assert.Equal("Take the red one.", r.History.Messages[1].Text);
+    }
+
+    [Fact]
     public async Task InterruptSavesThePartialReplyWithTheMark()
     {
         var r = new Rig();
         var firstChunk = new TaskCompletionSource();
         r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
-        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Once upon ")), (10_000, new TextChunk("never shown")));
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Sit down, you. Once upon ")), (10_000, new TextChunk("never shown")));
         var send = r.Conv.SendAsync("tell me a story");
         await firstChunk.Task;
         Assert.True(r.Conv.IsBusy);
@@ -120,7 +163,7 @@ public class ConversationTests
         Assert.False(r.Conv.IsBusy);
         var done = Assert.Single(r.Of<ReplyDone>());
         Assert.True(done.Interrupted);
-        Assert.Equal("Once upon [interrupted]", r.History.Messages[1].Text);
+        Assert.Equal("Sit down, you. Once upon [interrupted]", r.History.Messages[1].Text);
     }
 
     [Fact]
@@ -131,7 +174,7 @@ public class ConversationTests
         r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
         // the brain produced "Once upon a time, ", the bubble had only revealed "Once up"
         r.Conv.ShownText = turn => turn == 1 ? "Once up" : "";
-        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Once upon a time, ")), (10_000, new TextChunk("never")));
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Sit down, you. Once upon a time, ")), (10_000, new TextChunk("never")));
         var send = r.Conv.SendAsync("tell me a story");
         await firstChunk.Task;
         r.Conv.Interrupt();
@@ -147,7 +190,7 @@ public class ConversationTests
         var firstChunk = new TaskCompletionSource();
         r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
         r.Conv.ShownText = _ => "";
-        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Secret words that nobody saw. ")), (10_000, new TextChunk("x")));
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Secret words that you never saw. ")), (10_000, new TextChunk("x")));
         var send = r.Conv.SendAsync("hello");
         await firstChunk.Task;
         r.Conv.Interrupt();
@@ -163,7 +206,7 @@ public class ConversationTests
         r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
         r.Conv.ShownText = turn => turn == 1 ? "Long" : "";
         r.Brain.Script = (n, ct) => n == 1
-            ? FakeBrain.Steps(ct, (0, new TextChunk("Long answer that goes on ")), (10_000, new TextChunk("x")))
+            ? FakeBrain.Steps(ct, (0, new TextChunk("You wait, long answer that goes on ")), (10_000, new TextChunk("x")))
             : FakeBrain.Steps(ct, (0, new TextChunk("Sure. [idle]")), (0, FakeBrain.Done()));
         var first = r.Conv.SendAsync("one");
         await firstChunk.Task;
@@ -225,7 +268,7 @@ public class ConversationTests
         var firstChunk = new TaskCompletionSource();
         r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
         r.Conv.ShownText = _ => "Once up";
-        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Once upon a time, ")), (10_000, new TextChunk("x")));
+        r.Brain.Script = (_, ct) => FakeBrain.Steps(ct, (0, new TextChunk("Sit down, you. Once upon a time, ")), (10_000, new TextChunk("x")));
         var send = r.Conv.SendAsync("story");
         await firstChunk.Task;
         r.Conv.Interrupt();
@@ -241,7 +284,7 @@ public class ConversationTests
         var firstChunk = new TaskCompletionSource();
         r.Bus.Subscribe<ReplyChunk>(_ => firstChunk.TrySetResult());
         r.Brain.Script = (n, ct) => n == 1
-            ? FakeBrain.Steps(ct, (0, new TextChunk("Long answer ")), (10_000, new TextChunk("x")))
+            ? FakeBrain.Steps(ct, (0, new TextChunk("You wait, long answer ")), (10_000, new TextChunk("x")))
             : FakeBrain.Steps(ct, (0, new TextChunk("Sure. [idle]")), (0, FakeBrain.Done()));
         var first = r.Conv.SendAsync("one");
         await firstChunk.Task;
@@ -249,7 +292,7 @@ public class ConversationTests
         await Task.WhenAll(first, second);
 
         Assert.Equal(2, r.Brain.Calls.Count);
-        Assert.Contains(r.Brain.Calls[1], m => m.Role == Role.Assistant && m.Text == "Long answer [interrupted]");
+        Assert.Contains(r.Brain.Calls[1], m => m.Role == Role.Assistant && m.Text == "You wait, long answer [interrupted]");
         Assert.Equal("two", r.Brain.Calls[1][^1].Text);
         // TurnIds: the old reply's done event carries the old id, so listeners drop it
         var ids = r.Of<ReplyDone>().Select(d => d.TurnId).ToList();

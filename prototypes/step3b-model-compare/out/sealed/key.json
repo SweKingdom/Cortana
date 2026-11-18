@@ -1,0 +1,52 @@
+{
+  "1": {
+    "A": "sonnet",
+    "B": "haiku-low",
+    "C": "haiku-default"
+  },
+  "2": {
+    "A": "sonnet",
+    "B": "haiku-low",
+    "C": "haiku-default"
+  },
+  "3": {
+    "A": "sonnet",
+    "B": "haiku-default",
+    "C": "haiku-low"
+  },
+  "4": {
+    "A": "haiku-default",
+    "B": "haiku-low",
+    "C": "sonnet"
+  },
+  "5": {
+    "A": "haiku-default",
+    "B": "haiku-low",
+    "C": "sonnet"
+  },
+  "6": {
+    "A": "haiku-low",
+    "B": "sonnet",
+    "C": "haiku-default"
+  },
+  "7": {
+    "A": "haiku-default",
+    "B": "haiku-low",
+    "C": "sonnet"
+  },
+  "8": {
+    "A": "haiku-low",
+    "B": "sonnet",
+    "C": "haiku-default"
+  },
+  "9": {
+    "A": "sonnet",
+    "B": "haiku-default",
+    "C": "haiku-low"
+  },
+  "10": {
+    "A": "sonnet",
+    "B": "haiku-low",
+    "C": "haiku-default"
+  }
+}

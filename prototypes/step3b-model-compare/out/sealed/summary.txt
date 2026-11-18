@@ -1,0 +1,10 @@
+Per setup (the numbers do not say which letter is which):
+haiku-low (claude-haiku-5-5, effort low): first word median 534 ms, p90 605 ms, max 1529 ms (n=10); thinking block first 1 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 7882, cache-read 26186, out 1235; API-equivalent cost 0,0029 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 195
+haiku-default (claude-haiku-5-5, effort default): first word median 585 ms, p90 1892 ms, max 2584 ms (n=10); thinking block first 3 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 8737, cache-read 25314, out 1667; API-equivalent cost 0,0033 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 195
+sonnet (claude-sonnet-5-5, effort default): first word median 1019 ms, p90 1522 ms, max 2129 ms (n=10); thinking block first 5 of 10; errors 0
+   quota: 10 calls; tokens fresh-in 20, cache-write 12526, cache-read 21339, out 1383; API-equivalent cost 0,0681 USD (a proxy: the plan's own weighting is not visible)
+   mood tag at the end: 10 of 10; leaked/odd tool markup: 0; median reply chars 222

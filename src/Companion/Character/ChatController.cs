@@ -66,6 +66,7 @@ internal sealed class ChatController : IDisposable
         bus.Subscribe<ThinkingStarted>(e => { if (_turns.IsCurrent(e.TurnId)) _window.SetActivity(Activity.Thinking); });
         bus.Subscribe<Filler>(e => { if (_turns.IsCurrent(e.TurnId)) _bubble.SetText(e.Text, filler: true); });
         bus.Subscribe<ReplyChunk>(OnReplyChunk);
+        bus.Subscribe<ReplyLeak>(OnReplyLeak);
         bus.Subscribe<ReplyDone>(OnReplyDone);
         bus.Subscribe<TurnFailed>(OnTurnFailed);
         bus.Subscribe<Interrupt>(_ => OnInterrupt());
@@ -199,6 +200,18 @@ internal sealed class ChatController : IDisposable
         _replyChars += e.Text.Length;
         if (_skipped) { OnReveal(e.Text); return; }   // Philip clicked to see it all: the rest of this reply is not paced
         _typewriter.Push(e.Text);   // the first character shows at once and replaces the filler; the rest is paced (D-063)
+    }
+
+    /// <summary>
+    /// What was sent so far turned out to be a note she wrote to herself. What the typewriter had not revealed yet is
+    /// skipped; what it had revealed is cleared, so the real reply starts on an empty bubble. The history already left it out.
+    /// </summary>
+    private void OnReplyLeak(ReplyLeak e)
+    {
+        if (!_turns.IsCurrent(e.TurnId)) return;
+        _replyChars = Math.Max(0, _replyChars - e.Chars);
+        _typewriter.Reset();
+        if (_shownText.Length > 0) { _shownText.Start(e.TurnId); _bubble.Hide(); }
     }
 
     /// <summary>A piece of the reply is due: the first one replaces the filler or the old reply.</summary>

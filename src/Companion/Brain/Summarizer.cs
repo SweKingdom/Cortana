@@ -40,7 +40,7 @@ internal sealed class Summarizer
     private readonly Quota _quota;
     private readonly string _quotaModel;
 
-    public Summarizer(IBrain brain, History history, MemoryStore memory, Quota quota, string quotaModel = ClaudeCodeBrain.Model)
+    public Summarizer(IBrain brain, History history, MemoryStore memory, Quota quota, string quotaModel = ClaudeCodeBrain.LightModel)
     {
         _brain = brain; _history = history; _memory = memory; _quota = quota; _quotaModel = quotaModel;
     }

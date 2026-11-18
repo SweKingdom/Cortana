@@ -1,0 +1,4 @@
+no history: system 1618 + stdin 113 tokens (chars/4)
+8 messages, ~160 chars: system 1618 + stdin 363 tokens (chars/4)
+20 messages, ~160 chars: system 1618 + stdin 731 tokens (chars/4)
+20 messages, ~600 chars: system 1618 + stdin 2199 tokens (chars/4)
