@@ -13,7 +13,7 @@ En privat skrivbordskompanjon i C# + WPF (.NET 10 LTS) som gör det Capri gör m
 | App-RAM | Private bytes för `Companion.exe` efter 60 s i vila | < 150 MB | < 150 MB |
 | Hela trädets RAM | Appen + alla `claude`-processer, i vila (inga processer körs; under ett svar ca 480 MB, D-056), redovisas separat | < 300 MB | appen + modellservern; modellen ligger på grafikkortet |
 | VRAM | Aktivitetshanteraren, dedikerat GPU-minne | \~0 | ≤ 4–5 GB |
-| CPU i vila | Snitt över 60 s efter 30 s, klotet andas | < 2 % av en kärna (median av 3 körningar, D-052) | samma |
+| CPU i vila | Snitt över 60 s efter 30 s, klotet andas | Mål < 2 % av en kärna, redovisas men stoppar inget (D-052, D-079). Ett steg underkänns bara om dess median är mer än 0,5 punkter över `main` i en parad körning om 5 rundor (`tools/perfhistory.ps1`, D-078) | samma |
 | Start till synligt klot | Processtart till första ritade bild | < 1 s | < 1 s (modellen laddas först vid lägesbyte) |
 | Tid till första ord | Enter till första tecknet i bubblan | \~2 s | mäts när läget byggs |
 
@@ -141,6 +141,7 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
   NOTICE.md                Capris Required Notice-rader för porterad kod
   dev-memory/              decisions.md, session-memory.md, checklist.md
   tools/perfcheck.ps1      mäter RAM, CPU i vila och starttid
+  tools/perfhistory.ps1    jämför flera byggen mot basvärden (tomt fönster, stilla klot) i roterade rundor (D-078, D-079); perflib.ps1 delar koden, perfbaseline/ är basvärdesappen
   src/Companion/
     App.xaml(.cs)          start, single-instance, tray, kortkommandon (chatt, panik)
     Core/
@@ -399,7 +400,7 @@ Lyssning är push-to-talk med ett kortkommando; taligenkänningen väljs när vi
 
 **Snabbhet och avbrott (efter Neuro-sama):** texten strömmas, och så fort första hela meningen har kommit skickas den till rösten medan resten fortfarande skrivs. Klotet börjar pulsera direkt när första ordet kommer. Hon slutar prata och avbryter pågående svar så fort du trycker push-to-talk, skickar ett nytt meddelande med Enter eller klickar på henne (`CancellationToken` till både hjärna och röst). Att börja skriva avbryter inte längre (D-073): textrutan står öppen och du kan skriva nästa meddelande medan hon svarar. Det avbrutna svaret sparas i historiken med markeringen `[interrupted]`, så hon vet att hon blev avbruten.
 
-**Utfyllnadsord (thinking fillers, D-058).** När svaret dröjer visar appen en kort lokal rad i bubblan, t.ex. "Hmm...", "Let me think..." eller "Give me a sec, hotshot.", och klotet byter till `thinking`. Det händer bara när ingen riktig text har kommit 1,5 s efter Enter. Ett tänkandeblock i strömmen utlöser ingenting (Haiku tänker på de flesta korta svar och texten kommer ändå på ca 1 s, så en sådan utlösare fick raden att blinka förbi). Inget modellanrop. Samma rad visas aldrig två gånger i rad, ingenting visas på snabba svar, raden ersätts av det riktiga svaret när det kommer och sparas aldrig i historiken. Tiden är en enda konstant, `FillerTuning.NoWordMs`. Raderna ligger i `personality.normal.json` som `fillers` (en lista per läge; flyttade dit från en tillfällig lista i steg 3) och skickas aldrig till modellen. Utfyllnadsorden räknas inte som första ord i `perfcheck`.
+**Utfyllnadsord (thinking fillers, D-058).** När svaret dröjer visar appen en kort lokal rad i bubblan, t.ex. "Hmm...", "Let me think..." eller "Hold that thought.", och klotet byter till `thinking`. Det händer bara när ingen riktig text har kommit 1,5 s efter Enter. Ett tänkandeblock i strömmen utlöser ingenting (Haiku tänker på de flesta korta svar och texten kommer ändå på ca 1 s, så en sådan utlösare fick raden att blinka förbi). Inget modellanrop. Samma rad visas aldrig två gånger i rad, ingenting visas på snabba svar, raden ersätts av det riktiga svaret när det kommer och sparas aldrig i historiken. Tiden är en enda konstant, `FillerTuning.NoWordMs`. Raderna ligger i `personality.normal.json` som `fillers` (en lista per läge; flyttade dit från en tillfällig lista i steg 3) och skickas aldrig till modellen. Utfyllnadsorden räknas inte som första ord i `perfcheck`.
 
 **Inställningar** är ett vanligt fönster som skapas när det öppnas och kastas när det stängs:
 
@@ -605,6 +606,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-077) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-079) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.
