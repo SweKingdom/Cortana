@@ -5,7 +5,7 @@ namespace Companion.Brain;
 
 /// <summary>
 /// The one owner of the conversation history (D-055). Persisted as memory/normal/history.jsonl, one JSON object
-/// per line with "version": 1 (D-044). Step 3 adds the summary and the 30-message cap; until then it only grows.
+/// per line with "version": 1 (D-044). Past 30 messages the oldest are folded into the summary and removed (step 3).
 /// With no path it stays in memory (tests and the perfcheck chat probe).
 /// </summary>
 internal sealed class History
@@ -24,6 +24,7 @@ internal sealed class History
     }
 
     public IReadOnlyList<ChatMessage> Messages => _messages;
+    public int Count => _messages.Count;
     public IReadOnlyList<ChatMessage> Last(int n) => _messages.TakeLast(n).ToList();
 
     /// <summary>A finished or interrupted turn: the user's message and her reply (an interrupted one ends with [interrupted]).</summary>
@@ -57,6 +58,35 @@ internal sealed class History
             File.WriteAllLines(_path, lines);
         }
         catch (Exception ex) when (ex is IOException or JsonException) { /* a failed save must not break the chat */ }
+    }
+
+    /// <summary>
+    /// Removes the oldest <paramref name="count"/> messages (they have been folded into the summary) and rewrites the
+    /// file without them. Nothing happens for a count that is not positive.
+    /// </summary>
+    public void FoldOldest(int count)
+    {
+        count = Math.Min(count, _messages.Count);
+        if (count <= 0) return;
+        _messages.RemoveRange(0, count);
+        if (_path == null || !File.Exists(_path)) return;
+        try
+        {
+            var keep = new List<string>();
+            int seen = 0;
+            foreach (var raw in File.ReadLines(_path))
+            {
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                Line? l;
+                try { l = JsonSerializer.Deserialize<Line>(raw, Json); } catch (JsonException) { continue; }   // unreadable lines were already copied away at load
+                if (l is not { Role: "user" or "assistant" }) continue;
+                if (seen++ >= count) keep.Add(raw);
+            }
+            var tmp = _path + ".tmp";
+            File.WriteAllLines(tmp, keep);
+            File.Move(tmp, _path, overwrite: true);
+        }
+        catch (IOException) { /* the file keeps its old lines; they are folded again next time */ }
     }
 
     private void Add(ChatMessage m)

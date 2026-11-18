@@ -101,6 +101,9 @@ public partial class CharacterWindow : Window
     }
 
     internal void SetActivity(Activity activity) => Orb.Animator.SetActivity(activity);
+    internal void SetExpression(Expression expression) => Orb.Animator.SetExpression(expression);
+    internal void FadeExpression(double seconds, Action done) => Orb.Animator.FadeExpression(seconds, done);
+    internal void StopExpressionFade() => Orb.Animator.StopFade();
 
     private void UpdateAnimation()
     {

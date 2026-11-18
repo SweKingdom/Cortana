@@ -2,12 +2,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using Companion.Core;
+using Companion.Memory;
 
 namespace Companion.Brain;
 
 /// <summary>
 /// One conversation: the only module that calls the brain (architecture). Runs a turn at a time, tags every
-/// reply event with a TurnId (D-038), owns the history (D-055) and shows thinking fillers (D-058).
+/// reply event with a TurnId (D-038), owns the history (D-055), shows thinking fillers (D-058), saves the notes the
+/// model proposes with the `remember` tag (D-057) and folds old history into the summary when idle.
 /// Must be used from the UI thread; the turn continues on that thread after each await.
 /// </summary>
 internal sealed class Conversation
@@ -20,17 +22,26 @@ internal sealed class Conversation
     private readonly string _quotaModel;
     private readonly Func<DateTime> _now;
     private readonly int _noWordMs;
+    private readonly PromptBuilder _prompts;
+    private readonly MemoryStore? _memory;
+    private readonly Summarizer? _summarizer;
+    private readonly int _summaryDelayMs;
 
     private int _turnId, _ticket;
+    private bool _hasDraft;       // the chat input holds unsent text (open, or hidden with the draft kept): no summary (D-066, refined)
+    private CancellationTokenSource? _summaryCts;
     private CancellationTokenSource? _cts;
     private Task _running = Task.CompletedTask;
 
     public Conversation(EventBus bus, IBrain brain, History history, Quota quota, string quotaModel,
         Fillers? fillers = null, Func<DateTime>? now = null,
-        int noWordMs = FillerTuning.NoWordMs)
+        int noWordMs = FillerTuning.NoWordMs, PromptBuilder? prompts = null, MemoryStore? memory = null,
+        Summarizer? summarizer = null, int summaryDelayMs = SummaryTuning.IdleDelayMs)
     {
         _bus = bus; _brain = brain; _history = history; _quota = quota; _quotaModel = quotaModel;
-        _fillers = fillers ?? new Fillers();
+        _prompts = prompts ?? PromptBuilder.CreateDefault();
+        _memory = memory; _summarizer = summarizer; _summaryDelayMs = summaryDelayMs;
+        _fillers = fillers ?? new Fillers(() => _prompts.Personality.Fillers!);
         _now = now ?? (() => DateTime.Now);
         _noWordMs = noWordMs;
 
@@ -42,6 +53,9 @@ internal sealed class Conversation
     public bool IsBusy => _cts != null;
     public int CurrentTurnId => _turnId;
     public History History => _history;
+    public MemoryStore? Memory => _memory;
+    /// <summary>The background summary job, if one was scheduled after the last reply (for the perfcheck probe and tests).</summary>
+    public Task<SummaryResult?>? SummaryTask { get; private set; }
     /// <summary>Usage of the last finished turn (first block type, tokens); for the perfcheck probe and logs.</summary>
     public BrainUsage? LastUsage { get; private set; }
 
@@ -68,13 +82,33 @@ internal sealed class Conversation
         _savedInterrupted = true;
     }
 
-    /// <summary>The input opened or push-to-talk began: start the process now (D-055). Skipped while a reply runs.</summary>
-    public void PreWarm() { if (_cts == null) _brain.PreWarm(PromptBuilder.BuildSystem()); }
+    /// <summary>
+    /// The input opened, Philip typed the first key after a send, or push-to-talk began: start the process now (D-055,
+    /// D-071). Skipped while a reply runs; does nothing if a warm process already exists.
+    /// </summary>
+    public void PreWarm()
+    {
+        CancelSummary();   // the summary never runs next to a typing Philip
+        if (_cts == null) _brain.PreWarm(_prompts.BuildSystem());
+    }
     public void CancelPreWarm() => _brain.CancelPreWarm();
+
+    /// <summary>
+    /// Whether the chat input holds text (D-066 refined by D-071). The first keystroke cancels a waiting summary; when the
+    /// box is empty again the summary is scheduled anew (15 s of quiet) if the history is past the cap.
+    /// </summary>
+    public void SetDraft(bool hasText)
+    {
+        if (_hasDraft == hasText) return;
+        _hasDraft = hasText;
+        if (hasText) CancelSummary();
+        else if (!IsBusy) ScheduleSummary();
+    }
 
     /// <summary>Stop the running reply: the process is killed (D-055) and the partial reply is saved as [interrupted].</summary>
     public void Interrupt()
     {
+        CancelSummary();
         var c = _cts;
         if (c == null) return;
         _cts = null;
@@ -87,6 +121,7 @@ internal sealed class Conversation
     private async Task SendCoreAsync(string text)
     {
         int ticket = ++_ticket;
+        _hasDraft = false;
         var previous = _running;
         Interrupt();
         if (!previous.IsCompleted) await previous; // lets the interrupted turn write its history entry first
@@ -105,7 +140,7 @@ internal sealed class Conversation
     {
         var ct = cts.Token;
         var sw = Stopwatch.StartNew();
-        var messages = PromptBuilder.Build(_history.Last(Transcript.MaxHistory), text, _now());
+        var messages = _prompts.Build(_history.Last(Transcript.MaxHistory), text, _now());
         var cleaner = new ReplyCleaner();
         var shown = new StringBuilder();
         bool gotText = false, filler = false, interrupted = false;
@@ -183,8 +218,73 @@ internal sealed class Conversation
         if (interrupted) _history.AppendTurn(text, ShownText?.Invoke(turn) ?? reply, interrupted: true);   // she knows she was cut off, and only knows what was shown
         else if (reply.Length > 0) _history.AppendTurn(text, reply, interrupted: false);
         if (interrupted || reply.Length > 0) { _savedTurn = turn; _savedReply = reply; _savedInterrupted = interrupted; }
+        var mood = interrupted ? null : MoodTag.Parse(cleaner.Mood);
+        if (!interrupted) RunTools(turn, cleaner);
         Log.Event(interrupted ? "turn_interrupted" : "turn_done", ("turn", turn), ("ms", sw.ElapsedMilliseconds),
-            ("block", usage?.FirstBlock), ("out_tokens", usage?.OutputTokens));
-        _bus.Publish(new ReplyDone(turn, reply, interrupted));
+            ("block", usage?.FirstBlock), ("out_tokens", usage?.OutputTokens), ("mood", interrupted ? "-" : cleaner.Mood ?? "none"));
+        _bus.Publish(new ReplyDone(turn, reply, interrupted, mood));
+        if (!interrupted) ScheduleSummary();
+    }
+
+    /// <summary>
+    /// Step 3 knows one tool, `remember` (D-057 text protocol, strict parse). Anything else, or a tag that does not
+    /// parse, is logged (reason code only, never the text) and dropped; the second-process repair of the full tool
+    /// loop comes in step 5.
+    /// </summary>
+    private void RunTools(int turn, ReplyCleaner cleaner)
+    {
+        foreach (var raw in cleaner.ToolTags.Take(3))
+        {
+            if (!ToolTagParser.TryParseRemember(raw, out var call, out var error)) { Log.Event("tool_rejected", ("turn", turn), ("why", error)); continue; }
+            if (_memory == null) { Log.Event("tool_ignored", ("turn", turn)); continue; }
+            var r = _memory.Add(call.Kind, call.Text, call.Replaces);
+            switch (r.Status)
+            {
+                case AddStatus.Added:
+                    Log.Event("memory_added", ("turn", turn), ("id", r.Entry!.Id), ("kind", call.Kind));
+                    _bus.Publish(new MemoryProposal(turn, r.Entry));
+                    break;
+                case AddStatus.Full:
+                    Log.Event("memory_full", ("turn", turn), ("kind", call.Kind));
+                    _bus.Publish(new MemoryFull(turn, call.Kind));
+                    break;
+                default: Log.Event("memory_not_added", ("turn", turn), ("why", r.Status)); break;
+            }
+        }
+    }
+
+    // ---- summary (step 3) -----------------------------------------------------------------------------------------
+
+    private void CancelSummary()
+    {
+        var c = _summaryCts;
+        _summaryCts = null;
+        c?.Cancel();
+    }
+
+    /// <summary>After a reply: when the history is past the cap, fold it into the summary once the chat has been quiet for a while.</summary>
+    private void ScheduleSummary()
+    {
+        if (_summarizer is not { Due: true }) return;
+        CancelSummary();
+        var cts = new CancellationTokenSource();
+        _summaryCts = cts;
+        SummaryTask = RunSummaryAsync(cts);
+    }
+
+    private async Task<SummaryResult?> RunSummaryAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(_summaryDelayMs, cts.Token);
+            if (cts.IsCancellationRequested || IsBusy || _hasDraft) return null;   // only when idle and the input box is empty
+            return await _summarizer!.RunAsync(cts.Token);
+        }
+        catch (OperationCanceledException) { return null; }
+        finally
+        {
+            if (ReferenceEquals(_summaryCts, cts)) _summaryCts = null;
+            cts.Dispose();
+        }
     }
 }

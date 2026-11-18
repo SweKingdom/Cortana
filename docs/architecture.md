@@ -38,10 +38,11 @@ Personligheten ligger så nära Cortana från Halo som möjligt, medan utseendet
 - Vet att användaren heter Philip men hittar på egna smeknamn och frågar innan hon sparar favoriterna i facts.md.
 - Avslutar varje svar med en humörtagg, t.ex. `[happy]`.
 
-**Första utkast av `personality.normal.json`** (på engelska eftersom hon pratar engelska):
+**`personality.normal.json`** (steg 3; standardfilen ligger inbyggd i appen och kopieras till `%APPDATA%\Companion\` första gången, på engelska eftersom hon pratar engelska):
 
 ```json
 {
+  "version": 1,
   "name": "Cortana",
   "user": "Philip",
   "language": "Always reply in English, even if Philip writes in Swedish.",
@@ -70,18 +71,30 @@ Personligheten ligger så nära Cortana från Halo som möjligt, medan utseendet
   ],
   "nicknames": "Invent your own nicknames for Philip. Ask before saving the ones he likes to facts.md.",
   "examples": [
-    { "user": "morning", "cortana": "Morning, sleepyhead. You've got two reminders and a face that says coffee first. [teasing]" },
-    { "user": "can you remind me to call mom at 6", "cortana": "Done. Six o'clock, mom. I'll even pretend I didn't hear you almost forget. [happy]" },
+    { "user": "morning", "cortana": "Morning, sleepyhead. Coffee first, then world domination? [teasing]" },
+    { "user": "I hate mornings, by the way", "cortana": "Noted: mornings are the enemy. I'll go easy on you until the coffee kicks in. <tool name=\"remember\">{\"kind\":\"fact\",\"text\":\"Philip hates mornings\"}</tool> [happy]" },
     { "user": "what do you think of chatgpt", "cortana": "Cute. A little needy. Why, are you seeing other AIs? [flirty]" },
     { "user": "ugh this bug has taken 3 hours", "cortana": "Then we stop staring and start cornering it. Paste the error, hotshot. [concerned]" }
+  ],
+  "fillers": [
+    "Hmm...",
+    "Let me think...",
+    "Give me a sec, hotshot.",
+    "One moment...",
+    "Let me see...",
+    "Hang on, partner.",
+    "Working on it...",
+    "Mm, good question."
   ],
   "moods": "End every reply with exactly one tag: [idle] [happy] [teasing] [flirty] [concerned]."
 }
 ```
 
+Appen läser filen om den ändras på disk. Ett fält som saknas i en redigerad fil ersätts av standardvärdet, fält för fält; en trasig fil kopieras till `personality.normal.unreadable.json` och standarden används (D-047). `fillers` är de lokala utfyllnadsorden och skickas aldrig till modellen. De två ursprungliga exemplen med påminnelser (`morning` med "two reminders" och `can you remind me to call mom at 6`) är utbytta mot exempel som passar steg 3, eftersom påminnelser inte finns förrän steg 5 och exemplen skickas ordagrant i varje anrop; de ska tillbaka i steg 5. Exemplet med `remember` visar taggformatet (verktygstaggen före humörtaggen).
+
 Den nya taggen `[flirty]` får ett eget humör i animatorn: klotet blir varmare rosa med en långsam, mjuk puls.
 
-**Flirt-reglage.** Ett skjutreglage 0–4 i inställningarna (fliken Karaktär) och i tray-menyn. `PromptBuilder` skickar bara med instruktionerna för vald nivå, så ändringen gäller från nästa meddelande utan omstart. Nivå 4 är listan under "4" i utkastet ovan.
+**Flirt-reglage.** Ett skjutreglage 0–4 i inställningarna (fliken Karaktär) och i tray-menyn. `PromptBuilder` skickar bara med instruktionerna för vald nivå, så ändringen gäller från nästa meddelande utan omstart. Nivå 4 är listan under "4" i filen ovan. Standardnivån är 4 (D-017). I steg 3 väljs nivån i tray-menyn (Flirt level) och sparas som `flirtLevel` i `settings.json`; reglaget i inställningarna kommer i steg 4.
 
 | Nivå | Namn | Hur hon beter sig |
 | --- | --- | --- |
@@ -109,6 +122,8 @@ Spelläget kan sänka nivån automatiskt (t.ex. till 1) medan du spelar, om du v
 | sleeping | mörkblå, dimmad | mycket långsam puls | 10 min utan aktivitet |
 
 Tabellen har två dimensioner. **Aktivitet** (`idle`, `thinking`, `talking`, `sleeping`) styrs av appen och bestämmer rörelsen. **Uttryck** (`happy`, `teasing`, `flirty`, `concerned`) kommer från taggen i slutet av svaret och bestämmer färgen. De kombineras: `talking` + `flirty` blir varmt rosa och pulserande. Det explicita lägets tvilling har en egen magentafärgad variant.
+
+**Så här är det byggt (steg 3).** `OrbAnimator` väljer rörelse och färg ur Activity och Expression; allt är Storyboards med samma andning (skala och glödens ljusstyrka), så det finns ingen timer. Företräde: thinking, sedan talking, sedan uttryckets egen rörelse, sedan idle. *Thinking*: sex små lila partiklar cirklar runt klotet (ett varv på 3 s, 30 fps) över den färg som hålls (idle-blått om ingen), bara medan ett utfyllnadsord visas; klotet blir alltså inte lila (D-070). *Talking*: ljusblå, snabbare andning (1,6 s, 30 fps) från första synliga tecknet tills hela svaret syns; den följer inte texten tecken för tecken (kopplingen till ljud kommer i steg 6). Uttrycket sätts när svaret är klart (taggen står sist) och **hålls mellan meddelanden (D-070)**: färgen gäller tills ett svar med en annan humörtagg kommer (`[idle]` räknas som en annan tagg; ett svar utan tagg, ett avbrutet svar och ett misslyckat försök lämnar den som den är). Efter 10 minuter utan chatt tonas färgen över 60 s tillbaka till idle-blått (en enda engångstimer, `MoodHold`, ingen renderingsloop). Rörelserna: *happy* turkos med ett litet studs (tre snabba, större andetag), *teasing* rosa med en snabb blinkning av glöden (fem gånger), *flirty* varmt rosa med en långsam, mjuk puls (3 s), *concerned* orange med dovare sken och mindre andning. De ändliga rörelserna spelas när hon slutat prata och går sedan över till vanlig andning i uttryckets färg. **30 fps gäller bara thinking och talking (medan text visas, D-068).** När visningen är slut behåller uttrycket sin färg men går i vilotakten, 10 fps, och det gäller även en fäst bubbla; inget som kan överleva visningen får hålla 30 fps. Mätt med en fäst flirty-bubbla: CPU i vila 1,98 % (median av 3), jämfört med 2,14 % för en vanlig körning i samma pass, alltså inom bruset men utan marginal under 2 %. Med uttrycket hållet mellan meddelanden (D-070): flirty hållet 1,93 % och en vanlig körning 1,98 %, samma marginal. Happy-studsen och teasing-blinkningen går också i 10 fps och kan se hackiga ut. Utvecklarbrytare: `COMPANION_DEV=1` ger en undermeny "Preview (dev)" i tray-menyn som visar varje aktivitet och uttryck utan chatt.
 
 **Version 2 (senare):** en holografisk figur som sprite sheets. Animatorn tar emot samma humörnamn, så bara grafiken byts.
 
@@ -174,10 +189,10 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       OrbControl.xaml      greppringen och värdytan för klotet
       OrbVisual.cs         ritar klotet (sken + kärna) i en given skala; enda källan till utseendet
       OrbTuning.cs         andningens värden (fps, cykel, amplitud, glödens ljusstyrka) på ett ställe
-      IAnimator.cs         Activity-enum och SetActivity (SetExpression kommer i steg 3)
-      OrbAnimator.cs       klotet: andning (idle) och tänkande (lila, 30 fps, steg 2); partiklar och färg per humör kommer i steg 3
+      IAnimator.cs         Activity- och Expression-enum, SetActivity och SetExpression (steg 3)
+      OrbAnimator.cs       klotet: andning (idle), tänkande (lila, partiklar, 30 fps), prat (ljusblå, 30 fps) och färg + rörelse per uttryck (steg 3); sleeping kommer i steg 4
       SpriteAnimator.cs    (senare) sprite sheets, samma gränssnitt
-      SpeechBubble.cs      pratbubbla (Popup, byggd i kod); livslängd, paus vid hovring, fastnålning (D-062); Ja/Nej- och Ångra-knappar kommer i steg 5
+      SpeechBubble.cs      pratbubbla (Popup, byggd i kod); livslängd, paus vid hovring, fastnålning (D-062); Ångra-länk för minnesrader (steg 3); Ja/Nej-knappar kommer i steg 5
       ChatTuning.cs        konstanterna för bubblans livslängd (BubbleTuning) och skrivmaskinsvisningen (TypewriterTuning) på ett ställe
       TypewriterPacer.cs   takten för skrivmaskinsvisningen (D-063), ren logik utan timer och UI, enhetstestad
       ReplyTypewriter.cs   timern som kör takten; går bara medan text väntar på att visas
@@ -190,16 +205,20 @@ Cortana/                   repot (SweKingdom/Cortana, privat)
       ClaudeProcess.cs     en `claude`-process (flaggor, stdin/stdout, avbrott)
       Transcript.cs        de senaste 20 meddelandena som ett transkript + det nya
       History.cs           historiken (memory/normal/history.jsonl), enda ägaren (D-055)
-      Fillers.cs           utfyllnadsord och FillerTuning (D-058); tillfällig lista till steg 3
+      Fillers.cs           FillerTuning (D-058) och slumpvalet; raderna kommer från `fillers` i personlighetsfilen
       AnthropicBrain.cs    Claude med API-nyckel (valfritt)
       OpenAiCompatBrain.cs lokal modell, OpenRouter, OpenAI m.fl.
       ModelRouter.cs       Haiku eller Sonnet per meddelande
-      ReplyCleaner.cs      tar bort tänkande och verktygstext (efter Capris Leaks.cs)
+      ReplyCleaner.cs      tar bort tänkande och verktygstext (efter Capris Leaks.cs); samlar verktygstaggarna och humörtaggen
       LocalModelManager.cs (senare) startar och stoppar den lokala modellen
       Conversation.cs      historik, sammanfattning, verktygsloop
-      PromptBuilder.cs     personlighet + flirtnivå + minne + verktyg -> prompt
+      PromptBuilder.cs     personlighet + flirtnivå + minne + verktyg -> prompt, tokenbudget ~3 000 (steg 3)
+      Personality.cs       personlighetsfilen (version 1), fältvisa standardvärden, omläsning vid ändring (steg 3)
+      default.personality.normal.json  standardfilen, inbyggd i appen (steg 3)
+      ToolTagParser.cs     strikt läsning av `<tool name="remember">` (D-057); resten av verktygsloopen kommer i steg 5
+      Summarizer.cs        bakgrundsjobbet som viker de äldsta meddelandena in i summary.md (steg 3)
     Memory/
-      MemoryStore.cs       fakta, intryck, förslag om att spara, städning
+      MemoryStore.cs       facts.md, impressions.md, summary.md: rader med id, rättelser, Ångra, tak ~800 tokens (steg 3); städning kommer i steg 4
     Tools/
       ITool.cs, ToolRegistry.cs
       ReminderTool.cs, OpenTool.cs, RememberTool.cs
@@ -286,7 +305,8 @@ public interface IAnimator
 | `ReplyDone(text, mood)` | Conversation | SpeechBubble, Animator |
 | `Interrupt` | ChatInput, PushToTalk, klick på klotet | Conversation, Voice |
 | `ConfirmRequest(tool, args)` | ToolRegistry | SpeechBubble (Ja/Nej) |
-| `MemoryProposal(entry)` | MemoryStore | SpeechBubble (Ångra) |
+| `MemoryProposal(TurnId, entry)` | Conversation, när `remember` sparat en rad | ChatController -> SpeechBubble (Ångra) |
+| `MemoryFull(TurnId, kind)` | Conversation, när en minnesfil är full | ChatController -> SpeechBubble ("memory is full") |
 | `ReminderDue(text)` | ReminderTool | Conversation, Animator |
 | `ModeChanged(mode)` | ModeManager | alla moduler |
 | `GameModeChanged(on)` | GameMode | Animator, CharacterWindow, Conversation, ToolRegistry |
@@ -314,7 +334,7 @@ Karaktären bor i ett litet WPF-fönster på 168 × 168 px (rymmer andningens st
 
 - Klotet består av två `Ellipse` (sken och kärna) med `RadialGradientBrush`, byggda av `OrbVisual`. Skenet är en ellips lika stor som greppringen vars gradient tonar ut till alfa 0 (ingen `BlurEffect`, ingen `DropShadowEffect`: båda ritas om dyrt när de animeras).
 - Varje humör är en `Storyboard`. WPF:s kompositor driver dem, så det finns ingen egen timer och ingen `CompositionTarget.Rendering`. Animeringen går via elementets egenskapssökväg (`(UIElement.RenderTransform).(ScaleTransform.ScaleX)`); att peka på själva `ScaleTransform`-objektet gav ingen effekt.
-- **Bildfrekvens efter aktivitet (D-051):** idle = andning (skala 1,14 och glödens ljusstyrka 0,55-0,90 i takt, 4 s, sine ease in-out) med `Timeline.DesiredFrameRate=10` (D-054, värdena står som konstanter i `Character/OrbTuning.cs`); kantutjämning på bråkdelar av en pixel (`UseLayoutRounding` och `SnapsToDevicePixels` av) så att varje bildruta skiljer sig; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst. Steg 2 lägger till en enkel thinking (lila ton, samma andning dubbelt så snabbt, 30 fps) som bara går medan ett utfyllnadsord visas (D-058); partiklar och talking kommer i steg 3, sleeping och spelläge i steg 4.
+- **Bildfrekvens efter aktivitet (D-051):** idle = andning (skala 1,14 och glödens ljusstyrka 0,55-0,90 i takt, 4 s, sine ease in-out) med `Timeline.DesiredFrameRate=10` (D-054, värdena står som konstanter i `Character/OrbTuning.cs`); kantutjämning på bråkdelar av en pixel (`UseLayoutRounding` och `SnapsToDevicePixels` av) så att varje bildruta skiljer sig; thinking och talking = full animation med 30 fps; sleeping, dolt, låst skärm och spelläge = ingen animation. P3 visade att ingen bildfrekvens ger under 0,5 % CPU med ett ständigt andande klot (10 fps ger 1,3-1,8 %), därför budgeten på 2 % (D-052) och dyr rörelse bara när den betyder något. I steg 1 finns idle och dolt/låst. Steg 2 lägger till en enkel thinking (lila ton, samma andning dubbelt så snabbt, 30 fps) som bara går medan ett utfyllnadsord visas (D-058); steg 3 lägger till talking (ljusblå, 30 fps), partiklarna vid thinking och en färg och rörelse per uttryck (30 fps bara medan text visas, D-068) (se "Så här är det byggt" under Karaktären); sleeping och spelläge kommer i steg 4.
 - När fönstret är dolt (panikknappen) eller skärmen låst (`SessionSwitch`) stoppas storyboarden helt. Då ritas noll bilder.
 - Prövat och förkastat (P3b): att förrendera andningscykeln till ~40 bitmaps och byta bild med en timer gav ingen märkbar vinst (1,64 mot 1,77 % CPU, inom mätbruset) men ~10 MB mer RAM, en timer och DPI-problem. Koden finns kvar i `prototypes/P3b/`.
 - Dev-brytare, bara för mätning: `COMPANION_FPS`, `COMPANION_RENDER`, `COMPANION_PERF_FILE` (se README.md).
@@ -324,7 +344,7 @@ Karaktären bor i ett litet WPF-fönster på 168 × 168 px (rymmer andningens st
 
 **Skrivmaskinsvisning (D-063).** Svarstexten visas i jämn takt i stället för i råa strömbitar: talhastighet, grundtakt 16 tecken/s. Först när mer än ca 250 tecken väntar ökar takten gradvis, till högst 40 tecken/s (så att långa svar inte drar ut), och det görs pauser på 400 ms efter `.` `?` `!` och 180 ms efter komma. Första tecknet visas direkt när första biten kommer, så tiden till första ord ändras inte. Ett klick på bubblan medan texten fortfarande skrivs ut visar resten direkt; ett klick på en färdig bubbla fäster den som förut. Vid avbrott slutar texten där den är och blir stående lika länge som vanligt, och i historiken sparas bara den text som faktiskt visades i bubblan, följd av `[interrupted]` (text hon producerade men Philip aldrig såg sparas aldrig; är svaret redan färdigt och sparat kortas posten efteråt ned till det som visades). Ett klick som visar resten gör att även resten av det svaret visas direkt, utan takt. I steg 4 får teckenfliken ett reglage för textfart som styr grundtakten och bubblans livslängd. Timern (`ReplyTypewriter`) går bara medan text visas och stannar när allt är synligt, så den kostar inget i vila. Takten är ren logik i `TypewriterPacer`, och alla värden finns i `TypewriterTuning`.
 
-**Textinmatning:** klick på klotet eller ett globalt kortkommando (Ctrl+Alt+Space via `RegisterHotKey`, D-059; hård-kodad tills inställningarna i steg 4) öppnar en textruta under klotet, eller ovanför det om det inte finns plats under. Enter skickar och Esc stänger. Ett klick på klotet medan hon svarar avbryter svaret i stället för att öppna rutan. Ett svar som kommer (eller redan pågår) medan textrutan är öppen visas i bubblan, och att skriva i rutan avbryter det som vanligt; en färdig bubbla som bara räknar ned ger plats åt rutan, och en fäst bubbla ligger kvar tills du skickar.
+**Textinmatning:** klick på klotet eller ett globalt kortkommando (Ctrl+Alt+Space via `RegisterHotKey`, D-059; hård-kodad tills inställningarna i steg 4) öppnar en textruta under klotet, eller ovanför det om det inte finns plats under. Enter skickar och **rutan förblir öppen** och tom så att du kan fortsätta skriva (D-071); Esc stänger och rensar, kortkommandot (nu en växling), ett klick utanför och ett klick på klotet döljer rutan men **behåller det du skrivit** till nästa gång. Klick på bubblan (fäst, visa allt, Ångra) stänger inte rutan. Förvärmningen startar när rutan öppnas och igen vid första tangenttryckningen efter ett skickat meddelande (eller när de 60 s gått). Ett klick på klotet medan hon svarar och rutan är stängd avbryter svaret i stället för att öppna rutan. Ett svar som kommer (eller redan pågår) medan textrutan är öppen visas i bubblan, och att skriva i rutan avbryter det inte (D-073): bara Enter, ett klick på klotet och panik avbryter; en färdig bubbla som bara räknar ned ger plats åt rutan, och en fäst bubbla ligger kvar tills du skickar.
 
 ## Hjärnan
 
@@ -340,7 +360,7 @@ Tre klasser täcker alla hjärnor. Normalt läge använder ditt Claude-abonneman
 
 **ClaudeCodeBrain** kör Claude Code med flaggor från Capris `PlanBrain.cs` (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages --tools "" --strict-mcp-config --no-session-persistence --setting-sources project --safe-mode --disable-slash-commands --system-prompt-file …`). Haiku-turer får dessutom `--effort low` (D-061) så att de oftare börjar med text än med ett tänkandeblock; andra modeller (Sonnet-eskaleringar) behåller standardnivån. Det minskar tänkandet men tar inte bort det (prov på 3 meddelanden, långa prompter kan fortfarande tänka); utfyllnadsorden (D-058) är reserven. Lägsta version är Claude Code 2.1.318; äldre versioner saknar `--safe-mode` och filflaggorna. **Prototyp P1 avgjorde (D-055): en process per meddelande**, Capris sätt. Appen äger all historik och skickar de senaste 20 meddelandena som ett transkript tillsammans med det nya. Byte av modell, flirtnivå och läge kostar inget.
 
-Startkostnaden (~850 ms per process) döljs genom **förvärmning**: processen startas när textrutan öppnas eller push-to-talk börjar, så starten överlappar med att du skriver, och meddelandet skrivs vid Enter. Stängs rutan utan att något skickas, eller går det 60 s, dödas den varma processen. Mätt i P1: första ordet ca 0,8 s (median) med förvärmning och 3 s skrivtid, mot ca 1,9 s utan. Haiku-svar i chatten ska köras utan utökat tänkande (Sonnet-eskaleringar får tänka). P1 hittade ingen brytare som tar bort tänkandet, men vanliga chattmeddelanden började aldrig med ett tänkandeblock, så mekanismen avgörs i steg 2 (D-055).
+Startkostnaden (~850 ms per process) döljs genom **förvärmning**: processen startas när textrutan öppnas eller push-to-talk börjar, så starten överlappar med att du skriver, och meddelandet skrivs vid Enter. Stängs rutan utan att något skickas, eller går det 60 s, dödas den varma processen. Mätt i P1: första ordet ca 0,8 s (median) med förvärmning och 3 s skrivtid, mot ca 1,9 s utan. Haiku-svar i chatten ska köras utan utökat tänkande (Sonnet-eskaleringar får tänka). P1 hittade ingen brytare som tar bort tänkandet, men vanliga chattmeddelanden började aldrig med ett tänkandeblock. Steg 2 avgjorde mekanismen (D-061): `--effort low` för Haiku, med utfyllnadsorden som reserv.
 
 Alternativet en process per session mättes också (första ordet ca 0,5 s), men det lämnar ca 435 MB `claude`-minne i vila och ger appen och Claude Code varsin historik, så det valdes bort.
 
@@ -349,7 +369,7 @@ Det finns **en enda ägare av historiken**: appen. Avbrott dödar processen (ing
 - **Fire-and-forget** (`set_reminder`, `cancel_reminder`, `open`, `remember`): modellen skriver en kort bekräftelse, taggen och humörtaggen i samma svar, appen kör verktyget, och det blir en enda process. Bekräftelsen sägs innan verktyget har körts, så om verktyget misslyckas måste en andra runda rätta den.
 - **Läs tillbaka** (`list_reminders`): modellen skriver bara taggen, appen skickar resultatet i en andra process och modellen skriver svaret. En andra process behövs också när ett verktyg ger fel eller en tagg inte går att tolka (felet går tillbaka till henne).
 
-Loopen tillåter högst 3 rundor, en process per runda. Den andra processen förvärmas när en läs-tillbaka-tagg syns i strömmen, inte vid varje tagg (P2: förvärmning vid varje tagg startade 46 processer och 37 användes aldrig). Mätt i P2: tur med bara fire-and-forget första synliga ord ca 2,0 s och klar efter ca 2,4 s (median), tur med andra process ca 4,3 s och ca 4,6 s, mot ca 5,1 s och ca 6,1 s när varje verktygsanrop fick en andra process. Ej testat: att ett verktyg misslyckas, Sonnet, förfrågningar med historik. P2 såg också ett tänkandeblock först i 40 av 50 svar med verktygsprompten (ca 0,7 s senare första ord), så tänkandefrågan i D-055 avgörs i steg 2. Allt räknas mot abonnemangets gränser (se Driftregler, punkt 2).
+Loopen tillåter högst 3 rundor, en process per runda. Den andra processen förvärmas när en läs-tillbaka-tagg syns i strömmen, inte vid varje tagg (P2: förvärmning vid varje tagg startade 46 processer och 37 användes aldrig). Mätt i P2: tur med bara fire-and-forget första synliga ord ca 2,0 s och klar efter ca 2,4 s (median), tur med andra process ca 4,3 s och ca 4,6 s, mot ca 5,1 s och ca 6,1 s när varje verktygsanrop fick en andra process. Ej testat: att ett verktyg misslyckas, Sonnet, förfrågningar med historik. P2 såg också ett tänkandeblock först i 40 av 50 svar med verktygsprompten (ca 0,7 s senare första ord), vilket steg 2 löste med `--effort low` (D-061). Allt räknas mot abonnemangets gränser (se Driftregler, punkt 2).
 
 **Egen arbetsmapp för hjärnan.** Hjärnans `claude`-process startas alltid i `%APPDATA%\Companion\brain\`, en tom mapp som appen äger, aldrig i repomappen. Annars läser den repots `CLAUDE.md` och tror att den ska bygga Cortana i stället för att vara hon. Tillsammans med `--setting-sources project` betyder det att inga användar- eller repoinställningar läcker in i hennes prompt.
 
@@ -364,6 +384,10 @@ Loopen tillåter högst 3 rundor, en process per runda. Den andra processen för
 5. Verktyget `remember` föreslår en ny post, och du kan ångra direkt i bubblan. En post är en rad med kort id, datum och källa: `- [f12 | 2026-11-16 | chat] Philip codes in C#`. En rättelse är en ny rad: `- [f19 | 2026-11-20 | chat | replaces f12] …`. Preferenser (t.ex. "keep replies short") ligger i `facts.md` under rubriken `## Preferences`.
 6. Tak: \~800 tokens per minnesfil, med städning som du godkänner (se Driftregler, punkt 5).
 7. Budget: \~3 000 tokens per anrop, uppskattat som tecken / 4 i `PromptBuilder`. Över budget tas de äldsta ordagranna meddelandena bort först, sedan kortas långa meddelanden. Personligheten kortas aldrig.
+
+**Så fungerar minnet (steg 3).** `remember` är det enda verktyget i steg 3 och använder textprotokollet i D-057: `<tool name="remember">{"kind":"fact|preference|impression","text":"…","replaces":"f12"}</tool>` före humörtaggen. Appen läser taggen strikt (exakt de kända egenskaperna, `text` 1-200 tecken, `replaces` bara ett id som finns) och en tagg som inte går att tolka loggas med en orsakskod och släpps; reparationen i en andra process kommer med verktygsloopen i steg 5. Raden skrivs direkt, bubblan visar "Remembered: …" med en Ångra-länk som tar bort raden (har den ersatt en äldre rad gäller den äldre igen). Hon har sagt vad hon noterat i själva svaret. Smeknamn sparas först när du sagt att du gillar dem. Fakta och preferenser ligger i `facts.md` (preferenser under `## Preferences`), intryck i `impressions.md`; en ersatt rad ligger kvar i filen men skickas inte till modellen, och prompten visar bara `- [id] text`. När en fil skulle passera ~800 tokens sparas ingenting; bubblan säger "My memory is full. I need a tidy-up before I can save more." och det loggas. Städningen som du godkänner kommer med inställningsfönstret i steg 4.
+
+**Sammanfattning (steg 3).** När historiken passerat 30 meddelanden vecklas de äldsta (så att 20 finns kvar) in i `summary.md` med ett Haiku-anrop i bakgrunden (`--effort low`, räknas i `quota.json`). Jobbet startar först 15 s efter ett färdigt svar och bara om textrutan är tom (öppen eller stängd, D-072) och ingen väntar på svar; första tangenttryckningen, ett skickat meddelande och förvärmningen när rutan öppnas avbryter det, och det startas om när rutan är tom igen eller efter nästa svar. Ett sparat utkast i en dold ruta räknas som text. Sammanfattningen är högst ca 120 ord och beskriver bara vad som hänt, aldrig vem hon är. Misslyckas anropet ändras ingenting. `history.jsonl` skrivs om utan de invikta meddelandena.
 
 ## Verktyg, röst, inställningar och säkerhet
 
@@ -398,7 +422,7 @@ Lyssning är push-to-talk med ett kortkommando; taligenkänningen väljs när vi
 
 **Snabbhet och avbrott (efter Neuro-sama):** texten strömmas, och så fort första hela meningen har kommit skickas den till rösten medan resten fortfarande skrivs. Klotet börjar pulsera direkt när första ordet kommer. Hon slutar prata och avbryter pågående svar så fort du trycker push-to-talk, börjar skriva eller klickar på henne (`CancellationToken` till både hjärna och röst). Det avbrutna svaret sparas i historiken med markeringen `[interrupted]`, så hon vet att hon blev avbruten.
 
-**Utfyllnadsord (thinking fillers, D-058).** När svaret dröjer visar appen en kort lokal rad i bubblan, t.ex. "Hmm...", "Let me think..." eller "Give me a sec, hotshot.", och klotet byter till `thinking`. Det händer bara när ingen riktig text har kommit 1,5 s efter Enter. Ett tänkandeblock i strömmen utlöser ingenting (Haiku tänker på de flesta korta svar och texten kommer ändå på ca 1 s, så en sådan utlösare fick raden att blinka förbi). Inget modellanrop. Samma rad visas aldrig två gånger i rad, ingenting visas på snabba svar, raden ersätts av det riktiga svaret när det kommer och sparas aldrig i historiken. Tiden är en enda konstant, `FillerTuning.NoWordMs`. Tills personlighetsfilen finns (steg 3) ligger raderna i en tillfällig lista i `Brain/Fillers.cs`; steg 3 flyttar dem till `personality.normal.json` som `fillers`, en lista per läge. Utfyllnadsorden räknas inte som första ord i `perfcheck`.
+**Utfyllnadsord (thinking fillers, D-058).** När svaret dröjer visar appen en kort lokal rad i bubblan, t.ex. "Hmm...", "Let me think..." eller "Give me a sec, hotshot.", och klotet byter till `thinking`. Det händer bara när ingen riktig text har kommit 1,5 s efter Enter. Ett tänkandeblock i strömmen utlöser ingenting (Haiku tänker på de flesta korta svar och texten kommer ändå på ca 1 s, så en sådan utlösare fick raden att blinka förbi). Inget modellanrop. Samma rad visas aldrig två gånger i rad, ingenting visas på snabba svar, raden ersätts av det riktiga svaret när det kommer och sparas aldrig i historiken. Tiden är en enda konstant, `FillerTuning.NoWordMs`. Raderna ligger i `personality.normal.json` som `fillers` (en lista per läge; flyttade dit från en tillfällig lista i steg 3) och skickas aldrig till modellen. Utfyllnadsorden räknas inte som första ord i `perfcheck`.
 
 **Inställningar** är ett vanligt fönster som skapas när det öppnas och kastas när det stängs:
 
@@ -573,7 +597,7 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - [ ] **1. Fönster och klot.** Genomskinligt, dragbart fönster med andande klot, tray-ikon med Avsluta, panikknapp, `perfcheck.ps1`. Innehåller prototyp **P3** (CPU i vila vid 30, 15 och 10 fps) och **P4** (klick-genomsläpp, `DragMove`, spellägets fönsterstilar över ett spel i borderless). *Klart när:* < 150 MB app-RAM, < 2 % CPU i vila (D-052), start < 1 s.
 - [ ] **Före steg 2: prototyp P1 och P2.** P1 (klar 2026-11-17, D-055, D-056): kör 20 turer med en process per meddelande och 20 med en process per session; mät första ord, RAM för `claude`-processen, `interrupt`, om `set_model` fungerar och tokenanvändning. P2 (klar 2026-11-17, D-057): 50 skriptade förfrågningar som kräver verktyg, inklusive två verktyg i ett svar och åtta utan verktyg; 0 trasiga och 0 läckta anrop, så textprotokollet behålls och MCP behövs inte. Variant B (bekräftelse och tagg i samma svar, andra process bara för `list_reminders` eller fel) vann över en andra process för varje anrop.
 - [x] **2. Chatt med Claude** (klar 2026-11-17: första ord 595 ms median med förvärmning, appen 92,7 MB, trädet i vila 92,7 MB). Textruta, pratbubbla, `ClaudeCodeBrain` enligt P1, strömning, `ReplyCleaner`, avbrott med TurnId, kvoträknare, återhämtning (Driftregler, punkt 8), `ModeSession` för normalt läge. *Klart när:* första ordet inom \~2 s och hela trädet < 300 MB.
-- [ ] **3. Personlighet, humör och minne.** Personlighetsfilen med exempel, flirtnivåer och `boundaries`, taggparser, aktivitet och uttryck till animation, minnesrader med id, Ångra, sammanfattning, minnestak och tokenbudget i `PromptBuilder`.
+- [x] **3. Personlighet, humör och minne** (klar 2026-11-17: första ord 695 ms median med förvärmning, appen 96,1 MB efter chatt, trädet i vila 96,1 MB, CPU i vila 1,85 %). Personlighetsfilen med exempel, flirtnivåer och `boundaries`, taggparser, aktivitet och uttryck till animation, minnesrader med id, Ångra (`remember` som enda verktyg), sammanfattning, minnestak och tokenbudget i `PromptBuilder`.
 - [ ] **4. Inställningar och spelläge.** Inställningsfönstret, `ModelRouter` (Haiku/Sonnet), Text/Röst, kortkommandon, spelläge, `ActivityWatcher` med initiativreglage och Stör ej.
 - [ ] **5. Verktyg.** Påminnelser och timers, öppna appar och sajter, de fem verktygsreglerna, Ja/Nej-bekräftelser med exakta argument, verktygsloopen enligt D-057 (fire-and-forget i en process, läs tillbaka eller fel i en andra, högst 3 rundor). Om `cancel_reminder` matchar flera påminnelser returneras träffarna så att hon frågar vilken; hon gissar aldrig.
 - [ ] **6. Röst (alfa).** Windows-rösten, klotet pulserar på visemer (prototyp **P5**), uppläsning från första meningen, avbrott med `SpeakAsyncCancelAll`, sedan push-to-talk. Tid till första ljud läggs till i `perfcheck`.
@@ -604,6 +628,6 @@ Det normala läget byggs först; efter steg 2 finns en fungerande kompanjon. Var
 - Vilken lokal modell (3–4B, licens som tillåter vuxeninnehåll)? Bestäms när det explicita läget byggs.
 - Tvillingens namn, röst och färg. Bestäms när det explicita läget byggs.
 
-Alla beslut med id och skäl (D-001 till D-063) finns i `dev-memory/decisions.md`.
+Alla beslut med id och skäl (D-001 till D-073) finns i `dev-memory/decisions.md`.
 
 **Prioritering:** det hostade läget byggs först och det lokala, explicita läget mycket senare. Inställningarna får redan från början ett val mellan **Text** och **Röst** för svaren. Röst blir troligen en moln-TTS via API-nyckel, bakom `IVoice`, så tjänsten kan väljas senare. Version 2 av karaktären ritas troligen av en artist.

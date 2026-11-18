@@ -9,32 +9,35 @@ internal static class FillerTuning
 
 /// <summary>
 /// Short local lines shown in the bubble while the real reply is slow (D-058). No model call, never saved to
-/// history. TEMPORARY list: step 3 moves these into the personality file as "fillers", one list per mode.
+/// history. The lines are the "fillers" list of the personality file (one list per mode); with none given the
+/// built-in default personality's list is used.
 /// </summary>
 internal sealed class Fillers
 {
-    public static readonly string[] Temporary =
-    {
-        "Hmm...", "Let me think...", "Give me a sec, hotshot.", "One moment...",
-        "Let me see...", "Hang on, partner.", "Working on it...", "Mm, good question.",
-    };
-
-    private readonly IReadOnlyList<string> _lines;
+    private readonly Func<IReadOnlyList<string>> _source;
     private readonly Random _rng;
     private int _last = -1;
 
+    /// <param name="lines">A fixed list (tests); null or empty uses the built-in personality's fillers.</param>
     public Fillers(IReadOnlyList<string>? lines = null, Random? rng = null)
+        : this(() => lines is { Count: > 0 } ? lines : Personality.Default.Fillers!, rng) { }
+
+    /// <summary>Reads the list on every use, so an edited personality file applies at once.</summary>
+    public Fillers(Func<IReadOnlyList<string>> source, Random? rng = null)
     {
-        _lines = lines is { Count: > 0 } ? lines : Temporary;
+        _source = source;
         _rng = rng ?? new Random();
     }
 
     /// <summary>A random line, never the same one twice in a row (when there is more than one line).</summary>
     public string Next()
     {
-        int i = _lines.Count == 1 ? 0 : _rng.Next(_lines.Count - 1);
-        if (_lines.Count > 1 && _last >= 0 && i >= _last) i++;   // skip over the previous index
+        var lines = _source();
+        if (lines.Count == 0) lines = Personality.Default.Fillers!;
+        int i = lines.Count == 1 ? 0 : _rng.Next(lines.Count - 1);
+        if (lines.Count > 1 && _last >= 0 && i >= _last) i++;   // skip over the previous index
+        if (i >= lines.Count) i = 0;                            // the list got shorter between two uses
         _last = i;
-        return _lines[i];
+        return lines[i];
     }
 }

@@ -36,3 +36,5 @@ Read once at startup; they do nothing when unset. For measurement and prototypes
 | `COMPANION_PERF_CHAT=W:C` | Makes the app drive its own chat path: W turns through the real flow and C cold turns, with history and quota in memory only. Used by `perfcheck.ps1 -Chat`. |
 | `COMPANION_PERF_TYPING_MS` | Simulated typing time before Enter in the real-flow turns (default 3000). |
 | `COMPANION_PERF_CHAT_FILE` | Path where the chat probe writes one JSON line per turn. |
+| `COMPANION_PERF_PINNED=Flirty` | Shows a pinned bubble that holds this expression (Happy, Teasing, Flirty, Concerned) and no chat. Used by `perfcheck.ps1 -Pinned Flirty` to measure idle CPU with a pinned expression. |
+| `COMPANION_DEV=1` | Adds a "Preview (dev)" submenu to the tray menu that shows each activity and expression without a chat (step 3). |

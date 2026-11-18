@@ -10,5 +10,6 @@ internal static class AppPaths
     public static string Brain => Path.Combine(Root, "brain");
     public static string MemoryNormal => Path.Combine(Root, "memory", "normal");
     public static string Logs => Path.Combine(Root, "logs");
+    public static string PersonalityNormal => Path.Combine(Root, "personality.normal.json");
     public static string QuotaFile => Path.Combine(Root, "quota.json");
 }

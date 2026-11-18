@@ -21,10 +21,11 @@ param(
     [int]$WarmupSeconds = 30,
     [int]$MeasureSeconds = 60,
     [switch]$NoBuild,
+    [string]$Pinned = "",
     [switch]$Chat,
     [switch]$ChatOnly,
     [int]$ChatWarm = 10,
-    [int]$ChatCold = 5,
+    [int]$ChatCold = 6,
     [int]$TypingMs = 3000
 )
 if ($ChatOnly) { $Chat = $true; $Runs = 0 }
@@ -77,6 +78,7 @@ for ($run = 1; $run -le $Runs; $run++) {
     Remove-Item $perfFile -ErrorAction SilentlyContinue
     $env:COMPANION_PERF_FILE = $perfFile
     $env:COMPANION_FPS = "$Fps"
+    if ($Pinned) { $env:COMPANION_PERF_PINNED = $Pinned }
     if ($Render -eq "hardware") { $env:COMPANION_RENDER = "hardware" } else { Remove-Item Env:COMPANION_RENDER -ErrorAction SilentlyContinue }
 
     Write-Host "Run $run/$Runs at $Fps fps ($Render render)..."
@@ -107,7 +109,7 @@ for ($run = 1; $run -le $Runs; $run++) {
         Remove-Item $perfFile -ErrorAction SilentlyContinue
     }
 }
-Remove-Item Env:COMPANION_PERF_FILE, Env:COMPANION_FPS, Env:COMPANION_RENDER -ErrorAction SilentlyContinue
+Remove-Item Env:COMPANION_PERF_FILE, Env:COMPANION_FPS, Env:COMPANION_RENDER, Env:COMPANION_PERF_PINNED -ErrorAction SilentlyContinue
 
 function Row($name, $value, $fmt, $limit, $unit) {
     $ok = $value -lt $limit
@@ -124,7 +126,7 @@ $med = [pscustomobject]@{
 }
 
 Write-Host ""
-Write-Host "Median of $Runs runs at $Fps fps, $Render render (D-052):"
+Write-Host ("Median of $Runs runs at $Fps fps, $Render render (D-052)" + $(if ($Pinned) { ", with a pinned bubble holding the $Pinned expression" } else { "" }) + ":")
 $ok = @(
     (Row 'App private bytes'          $med.PrivateMB '{0:F1}' $maxPrivateMB 'MB'),
     (Row 'Whole tree (incl. claude)'  $med.TreeMB    '{0:F1}' $maxTreeMB    'MB'),
@@ -197,6 +199,15 @@ if ($Chat) {
     Write-Host ("  turns that started with a thinking block: {0}/{1}; turns that showed a filler: {2}/{1}" -f $thinking, $turns.Count, $fillers)
     Write-Host ("  claude processes at once during a reply: up to {0}; tree peak while claude runs: {1:F0} MB (reported separately, D-056)" -f $peakProcs, $peakTree)
     Write-Host ("  at rest after the chat: {0} claude process(es)" -f $restKids)
+    $tagged = @($turns | Where-Object { $_.mood }).Count
+    $notes = ($turns | Measure-Object -Property notes -Sum).Sum
+    $fullNotes = ($turns | Measure-Object -Property fullNotes -Sum).Sum
+    $talk = @($turns | Where-Object { $null -ne $_.talkCpuPct } | ForEach-Object { [double]$_.talkCpuPct })
+    $talkMs = @($turns | Where-Object { $null -ne $_.talkMs } | ForEach-Object { [double]$_.talkMs })
+    Write-Host ("  replies that ended with a mood tag: {0}/{1}; notes saved with remember: {2} (memory-full: {3})" -f $tagged, $turns.Count, $notes, $fullNotes)
+    if ($talk.Count) { Write-Host ("  app CPU while a reply is shown (talking animation at 30 fps, typewriter and stream parsing; claude not counted; not a budget): median {0:F1}% of one core, p90 {1:F1}%, max {2:F1}% (n={3}, median {4:F1} s per reply)" -f (Get-Pct $talk 0.5), (Get-Pct $talk 0.9), ($talk | Measure-Object -Maximum).Maximum, $talk.Count, ((Get-Pct $talkMs 0.5) / 1000)) }
+    $sum = Get-Content $chatFile | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.summary }
+    if ($sum) { Write-Host ("  background summary: folded {0} messages into {1} characters in {2:F0} ms; history after: {3} messages" -f $sum.folded, $sum.chars, $sum.ms, $sum.historyAfter) } else { Write-Host "  background summary: none ran (needs more than 30 messages and 15 s of quiet)" }
 
     Write-Host ""
     Write-Host "Chat budget:"
@@ -206,7 +217,7 @@ if ($Chat) {
     if ($failed -gt 0) { Write-Host "  WARNING: $failed turn(s) failed; first word is over the successful turns only"; $ok += $false }
 
     $stamp2 = Get-Date -Format 'yyyyMMdd-HHmmss'
-    [pscustomobject]@{ version = 1; typingMs = $TypingMs; turns = $turns; peakTreeMB = $peakTree; privateMB = $privMB; restTreeMB = $restTreeMB } |
+    [pscustomobject]@{ version = 1; typingMs = $TypingMs; turns = $turns; summary = $sum; peakTreeMB = $peakTree; privateMB = $privMB; restTreeMB = $restTreeMB } |
         ConvertTo-Json -Depth 4 | Set-Content (Join-Path $outDir "perf-chat-$stamp2.json") -Encoding utf8
     Remove-Item $chatFile -ErrorAction SilentlyContinue
 }
